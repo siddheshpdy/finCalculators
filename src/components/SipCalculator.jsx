@@ -3,17 +3,6 @@ import { useFinance } from '../hooks/useFinance';
 import WealthChart from './WealthChart';
 
 const SipCalculator = () => {
-  const colors = {
-    pageBg: '#1E293B',
-    cardBg: '#FFFFFF',
-    textMain: '#1E293B', // Deep Slate / Black for text
-    textMuted: '#64748B',
-    primary: '#059669',
-    secondary: '#334155',
-    inputBg: '#334155',   // Dark inputs from screenshot
-    accent: '#F8FAFC'
-  };
-
   const [inputs, setInputs] = useState({
     amount: 5000,
     rate: 12,
@@ -21,163 +10,162 @@ const SipCalculator = () => {
     stepUpPercent: 10,
     stepUpValue: 0
   });
-
+  const [activeStrategy, setActiveStrategy] = useState('percent'); // 'percent' or 'fixed'
   const [activeTab, setActiveTab] = useState('stepUp');
 
   const { calculateSIP } = useFinance();
 
-  const results = useMemo(() =>
-    calculateSIP(
-      Number(inputs.amount),
-      Number(inputs.rate),
-      Number(inputs.years),
-      Number(inputs.stepUpPercent),
-      Number(inputs.stepUpValue)
-    ),
-    [inputs, calculateSIP]
-  );
+  const results = useMemo(() => calculateSIP(
+    Number(inputs.amount), Number(inputs.rate), Number(inputs.years),
+    activeStrategy === 'percent' ? Number(inputs.stepUpPercent) : 0,
+    activeStrategy === 'fixed' ? Number(inputs.stepUpValue) : 0
+  ), [inputs, activeStrategy, calculateSIP]);
 
-  const chartData = useMemo(() => {
-    return results.breakdown.map(yearData => ({
-      name: `Year ${yearData.year}`,
-      Invested: activeTab === 'stepUp' ? Number(yearData.stepUp.investedAmount) : Number(yearData.normal.investedAmount),
-      TotalValue: activeTab === 'stepUp' ? Number(yearData.stepUp.totalValue) : Number(yearData.normal.totalValue)
-    }));
-  }, [results, activeTab]);
+  const chartData = useMemo(() => results.breakdown.map(d => ({
+    name: `Yr ${d.year}`,
+    Invested: Number(activeTab === 'stepUp' ? d.stepUp.investedAmount : d.normal.investedAmount),
+    TotalValue: Number(activeTab === 'stepUp' ? d.stepUp.totalValue : d.normal.totalValue)
+  })), [results, activeTab]);
 
-  const handleInputChange = (field, value) => {
-    setInputs(prev => ({
-      ...prev,
-      [field]: value,
-      ...(field === 'stepUpPercent' && value > 0 ? { stepUpValue: 0 } : {}),
-      ...(field === 'stepUpValue' && value > 0 ? { stepUpPercent: 0 } : {})
-    }));
+  const handleInputChange = (field, val) => {
+    setInputs(prev => ({ ...prev, [field]: val }));
   };
 
   return (
-    <div style={{ backgroundColor: colors.pageBg, minHeight: '100vh', padding: '40px 20px' }}>
-      <div style={cardContainer}>
-        <h1 style={{ textAlign: 'center', color: colors.textMain, fontSize: '32px', marginBottom: '40px' }}>
-          Investment Planner
-        </h1>
+    <div style={{ backgroundColor: '#F1F5F9', minHeight: '100vh', padding: '40px' }}>
+      <div style={containerStyle}>
+        <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1E293B', marginBottom: '30px' }}>Investment Planner</h2>
 
-        {/* INPUT FIELDS SECTION */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '40px' }}>
-          
-          {/* Left Side: SIP Details */}
-          <div style={{ textAlign: 'center' }}>
-            <p style={subHeaderStyle}>sip details</p>
-            
-            <div style={inputGroup}>
-              <label style={labelStyle}>Monthly Investment (₹)</label>
-              <input style={darkInput} type="number" value={inputs.amount} onChange={(e) => handleInputChange('amount', e.target.value)} />
-            </div>
-
-            <div style={inputGroup}>
-              <label style={labelStyle}>Expected Return Rate (%)</label>
-              <input style={darkInput} type="number" value={inputs.rate} onChange={(e) => handleInputChange('rate', e.target.value)} />
-            </div>
-
-            <div style={inputGroup}>
-              <label style={labelStyle}>Investment Tenure (Years)</label>
-              <input style={darkInput} type="number" value={inputs.years} onChange={(e) => handleInputChange('years', e.target.value)} />
-            </div>
+        <div style={controlGrid}>
+          {/* SIP Details Card */}
+          <div style={innerCard}>
+            <p style={cardHeading}>SIP Details</p>
+            <DualInput label="Monthly Investment" symbol="₹" value={inputs.amount} min={500} max={100000} step={500}
+                       onChange={(val) => handleInputChange('amount', val)} />
+            <DualInput label="Expected Return Rate" symbol="%" value={inputs.rate} min={1} max={30} step={0.5}
+                       onChange={(val) => handleInputChange('rate', val)} />
+            <DualInput label="Investment Tenure" symbol="Yrs" value={inputs.years} min={1} max={40} step={1}
+                       onChange={(val) => handleInputChange('years', val)} />
           </div>
 
-          {/* Right Side: Step-Up Box */}
-          <div style={{ backgroundColor: colors.accent, padding: '30px', borderRadius: '12px', textAlign: 'center' }}>
-            <p style={{ fontWeight: 'bold', color: colors.textMain, marginBottom: '5px' }}>Step-Up Strategy</p>
-            
-            <p style={labelStyle}>Yearly Increase (%)</p>
-            <input style={darkInput} type="number" value={inputs.stepUpPercent} onChange={(e) => handleInputChange('stepUpPercent', e.target.value)} />
+          {/* Step-Up Strategy Card */}
+          <div style={innerCard}>
+            <p style={cardHeading}>Step-Up Strategy</p>
+            <div style={toggleWrapper}>
+              <button onClick={() => setActiveStrategy('percent')} style={toggleBtn(activeStrategy === 'percent')}>%</button>
+              <button onClick={() => setActiveStrategy('fixed')} style={toggleBtn(activeStrategy === 'fixed')}>₹</button>
+            </div>
+            {activeStrategy === 'percent' ? (
+              <DualInput label="Yearly Increase (%)" symbol="%" value={inputs.stepUpPercent} min={1} max={50} step={1}
+                           onChange={(val) => handleInputChange('stepUpPercent', val)} />
+            ) : (
+              <DualInput label="Fixed Annual Increase" symbol="₹" value={inputs.stepUpValue} min={0} max={50000} step={500}
+                           onChange={(val) => handleInputChange('stepUpValue', val)} />
+            )}
+          </div>
 
-            <p style={{ margin: '15px 0', fontSize: '10px', color: colors.textMuted }}>OR</p>
-
-            <p style={labelStyle}>Fixed Annual Increase (₹)</p>
-            <input style={darkInput} type="number" value={inputs.stepUpValue} onChange={(e) => handleInputChange('stepUpValue', e.target.value)} />
+          {/* Results Comparison Card */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <div onClick={() => setActiveTab('stepUp')} style={maturityCard(activeTab === 'stepUp', '#10B981')}>
+              <p style={labelSmall}>STEP-UP MATURITY</p>
+              <h3 style={valueLarge}>₹{Number(results.summary.stepUpSip.totalValue).toLocaleString('en-IN')}</h3>
+              {activeTab === 'stepUp' && <span style={activeBadge}>● Active View</span>}
+            </div>
+            <div onClick={() => setActiveTab('normal')} style={maturityCard(activeTab === 'normal', '#3B82F6')}>
+              <p style={labelSmall}>NORMAL MATURITY</p>
+              <h3 style={valueLarge}>₹{Number(results.summary.normalSip.totalValue).toLocaleString('en-IN')}</h3>
+              {activeTab === 'normal' && <span style={activeBadgeBlue}>● Active View</span>}
+            </div>
           </div>
         </div>
 
-        {/* MATURITY BOXES */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '40px' }}>
-          <div 
-            onClick={() => setActiveTab('stepUp')}
-            style={resultBox(colors.primary, activeTab === 'stepUp')}
-          >
-            <span style={{ fontSize: '10px', fontWeight: 'bold', color: colors.primary }}>STEP-UP MATURITY</span>
-            <h2 style={{ margin: '10px 0', fontSize: '24px', color: colors.textMain }}>
-              ₹{Number(results.summary.stepUpSip.totalValue).toLocaleString('en-IN')}
-            </h2>
-            {activeTab === 'stepUp' && <div style={activeIndicator}>Active View</div>}
-          </div>
-
-          <div 
-            onClick={() => setActiveTab('normal')}
-            style={resultBox('#CBD5E1', activeTab === 'normal')}
-          >
-            <span style={{ fontSize: '10px', fontWeight: 'bold', color: colors.textMuted }}>NORMAL MATURITY</span>
-            <h2 style={{ margin: '10px 0', fontSize: '24px', color: colors.textMain }}>
-              ₹{Number(results.summary.normalSip.totalValue).toLocaleString('en-IN')}
-            </h2>
-            {activeTab === 'normal' && <div style={activeIndicator}>Active View</div>}
-          </div>
+        {/* Chart Section */}
+        <div style={{ ...innerCard, marginBottom: '30px' }}>
+          <p style={cardHeading}>{activeTab === 'stepUp' ? 'Step-Up' : 'Normal'} Wealth Projection</p>
+          <WealthChart data={chartData} primaryColor={activeTab === 'stepUp' ? "#10B981" : "#3B82F6"} secondaryColor="#64748B" />
         </div>
 
-        {/* CHART SECTION */}
-        <div style={{ marginBottom: '60px' }}>
-          <h3 style={{ fontSize: '18px', color: colors.textMain, textAlign: 'center', marginBottom: '20px' }}>
-            {activeTab === 'stepUp' ? 'Step-Up' : 'Normal'} Wealth Projection
-          </h3>
-          <WealthChart data={chartData} primaryColor={colors.primary} secondaryColor={colors.secondary} />
-        </div>
-
-        {/* TABLE SECTION (Fixed Text Color to Black/Slate) */}
-        <h2 style={{ textAlign: 'center', color: colors.textMain, fontSize: '22px', marginBottom: '20px', textTransform: 'capitalize' }}>
-          {activeTab === 'stepUp' ? 'Step up' : 'Normal'} sip breakdown
-        </h2>
-        <div style={tableWrapper}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ backgroundColor: '#1E293B', color: 'white' }}>
-              <tr>
-                <th style={thStyle}>Year</th>
-                <th style={thStyle}>Monthly SIP</th>
-                <th style={thStyle}>Invested (Cumulative)</th>
-                <th style={thStyle}>Maturity Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.breakdown.map((row) => {
-                const data = activeTab === 'stepUp' ? row.stepUp : row.normal;
-                return (
-                  <tr key={row.year} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                    <td style={tdStyle}>{row.year}</td>
-                    <td style={tdStyle}>₹{Number(activeTab === 'stepUp' ? data.monthlyInstallment : inputs.amount).toLocaleString('en-IN')}</td>
-                    <td style={tdStyle}>₹{Number(data.investedAmount).toLocaleString('en-IN')}</td>
-                    <td style={{ ...tdStyle, color: colors.primary, fontWeight: 'bold' }}>
-                      ₹{Number(data.totalValue).toLocaleString('en-IN')}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {/* Breakdown Table */}
+        <div style={innerCard}>
+          <p style={cardHeading}>{activeTab === 'stepUp' ? 'Step-Up' : 'Normal'} SIP Breakdown</p>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: '#64748B', fontSize: '13px' }}>
+                  <th style={thStyle}>Year</th>
+                  <th style={thStyle}>Monthly SIP</th>
+                  <th style={thStyle}>Cumulative Investment</th>
+                  <th style={thStyle}>Maturity Value</th>
+                </tr>
+              </thead>
+              <tbody style={{ color: '#1E293B', fontSize: '14px' }}>
+                {results.breakdown.map((row) => {
+                  const data = activeTab === 'stepUp' ? row.stepUp : row.normal;
+                  return (
+                    <tr key={row.year} style={{ borderTop: '1px solid #F1F5F9' }}>
+                      <td style={tdStyle}>{row.year}</td>
+                      <td style={tdStyle}>₹{Number(activeTab === 'stepUp' ? data.monthlyInstallment : inputs.amount).toLocaleString('en-IN')}</td>
+                      <td style={tdStyle}>₹{Number(data.investedAmount).toLocaleString('en-IN')}</td>
+                      <td style={{ ...tdStyle, fontWeight: '600', color: activeTab === 'stepUp' ? '#10B981' : '#3B82F6' }}>
+                        ₹{Number(data.totalValue).toLocaleString('en-IN')}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// CSS-in-JS Styles
-const cardContainer = { margin: '0 auto', backgroundColor: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.3)', fontFamily: 'sans-serif', maxWidth: '900px' };
-const subHeaderStyle = { fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', color: '#64748B', marginBottom: '20px' };
-const inputGroup = { marginBottom: '20px' };
-const labelStyle = { display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '8px' };
-const darkInput = { width: '100%', padding: '12px', borderRadius: '6px', border: 'none', backgroundColor: '#334155', color: 'white', textAlign: 'center', boxSizing: 'border-box', outline: 'none' };
-const resultBox = (borderColor, isActive) => ({ textAlign: 'center', padding: '20px', borderRadius: '12px', border: `2px solid ${isActive ? borderColor : '#E2E8F0'}`, backgroundColor: isActive ? '#F0FDF4' : 'white', cursor: 'pointer', position: 'relative' });
-const activeIndicator = { fontSize: '9px', backgroundColor: '#1E293B', color: 'white', padding: '2px 8px', borderRadius: '10px', position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)' };
-const tableWrapper = { borderRadius: '8px', overflow: 'hidden', border: '1px solid #E2E8F0' };
-const thStyle = { padding: '12px', fontSize: '12px', textAlign: 'center' };
-// Fixed tdStyle to use colors.textMain (Deep Slate) instead of inheriting white
-const tdStyle = { padding: '12px', fontSize: '13px', textAlign: 'center', color: '#1E293B' };
+// Reusable Sub-component for Slider + Manual Input
+const DualInput = ({ label, symbol, value, min, max, step, onChange }) => (
+  <div style={{ marginBottom: '25px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+      <label style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>{label}</label>
+      <div style={inputContainer}>
+        <input 
+          type="number" 
+          value={value} 
+          onChange={(e) => onChange(Number(e.target.value))}
+          style={numberInputStyle}
+        />
+        <span style={symbolStyle}>{symbol}</span>
+      </div>
+    </div>
+    <input 
+      type="range" 
+      min={min} 
+      max={max} 
+      step={step}
+      value={value} 
+      onChange={(e) => onChange(Number(e.target.value))} 
+      style={sliderStyle} 
+    />
+  </div>
+);
+
+// Styles
+const containerStyle = { maxWidth: '1200px', margin: '0 auto', backgroundColor: 'white', padding: '40px', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)' };
+const controlGrid = { display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: '25px', marginBottom: '30px' };
+const innerCard = { padding: '24px', borderRadius: '16px', border: '1px solid #F1F5F9', backgroundColor: '#FFFFFF' };
+const cardHeading = { fontSize: '14px', fontWeight: '600', color: '#64748B', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.05em' };
+const inputContainer = { position: 'relative', display: 'flex', alignItems: 'center' };
+const numberInputStyle = { padding: '6px 30px 6px 10px', width: '80px', borderRadius: '8px', color: '#64748B', border: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', fontWeight: '600', fontSize: '14px', textAlign: 'right', outline: 'none' };
+const symbolStyle = { position: 'absolute', right: '10px', fontSize: '12px', color: '#94A3B8', fontWeight: '600' };
+const sliderStyle = { width: '100%', accentColor: '#3B82F6', cursor: 'pointer' };
+const toggleWrapper = { display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '8px', marginBottom: '20px' };
+const toggleBtn = (active) => ({ padding: '6px 16px', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', backgroundColor: active ? '#3B82F6' : 'transparent', color: active ? 'white' : '#64748B', transition: '0.2s' });
+const maturityCard = (active, color) => ({ padding: '24px', borderRadius: '16px', cursor: 'pointer', border: `2px solid ${active ? color : '#F1F5F9'}`, backgroundColor: active ? `${color}05` : 'white', transition: '0.3s', boxShadow: active ? `0 10px 15px -3px ${color}20` : 'none' });
+const labelSmall = { fontSize: '11px', fontWeight: '700', color: '#94A3B8', marginBottom: '8px' };
+const valueLarge = { fontSize: '24px', fontWeight: '700', color: '#1E293B', margin: 0 };
+const activeBadge = { fontSize: '10px', color: '#10B981', fontWeight: '700', marginTop: '8px', display: 'block' };
+const activeBadgeBlue = { ...activeBadge, color: '#3B82F6' };
+const tableStyle = { width: '100%', borderCollapse: 'collapse' };
+const thStyle = { padding: '12px 8px' };
+const tdStyle = { padding: '12px 8px' };
 
 export default SipCalculator;
