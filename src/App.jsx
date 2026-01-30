@@ -1,7 +1,7 @@
 import { useState, React } from 'react'
 import './App.css'
 // 1. Import your custom component
-import SipCalculator from './components/SipCalculator';
+import WealthPlanner from './components/WealthPlanner';
 
 function App() {
   return (
@@ -17,10 +17,10 @@ function App() {
       
       <main>
         {/* 2. Use your component like an HTML tag */}
-        <SipCalculator />
+        <WealthPlanner />
       </main>
       <footer style={{ textAlign: 'center', marginTop: '40px', color: '#666' }}>
-        <p>Built with React 19 & Decimal.js</p>
+        <p>Built with React 19, Decimal.js, and Gemini. its fun project developed entirely using AI so calculations can be wrong</p>
       </footer>
     </div>
   );
