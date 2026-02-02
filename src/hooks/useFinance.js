@@ -1,16 +1,18 @@
 import Decimal from 'decimal.js';
 
 export const useFinance = () => {
-  const calculateSIP = (initialMonthlyInvestment, annualRate, years, stepUpPercent = 0, stepUpValue = 0) => {
-    const P_initial = new Decimal(initialMonthlyInvestment || 0);
+  // Add/Update these inside useFinance.js
+  const calculateSIP = (monthlyInvestment, annualRate, years, stepUpPercent = 0, stepUpValue = 0, initialLumpsum = 0) => {
     const r = new Decimal(annualRate || 0).div(100).div(12);
     const totalMonths = (years || 0) * 12;
 
-    let balanceStepUp = new Decimal(0);
-    let balanceNormal = new Decimal(0);
-    let investedStepUp = new Decimal(0);
-    let investedNormal = new Decimal(0);
-    let currentStepUpP = new Decimal(initialMonthlyInvestment || 0);
+    // Start the balance with the initial lumpsum
+    let balanceStepUp = new Decimal(initialLumpsum || 0);
+    let balanceNormal = new Decimal(initialLumpsum || 0);
+
+    let investedStepUp = new Decimal(initialLumpsum || 0);
+    let investedNormal = new Decimal(initialLumpsum || 0);
+    let currentStepUpP = new Decimal(monthlyInvestment || 0);
 
     const yearlyBreakdown = [];
 
@@ -24,17 +26,13 @@ export const useFinance = () => {
         }
       }
 
-      // Step-up accumulation
+      // Accumulate
       investedStepUp = investedStepUp.plus(currentStepUpP);
-      balanceStepUp = balanceStepUp.plus(currentStepUpP);
-      balanceStepUp = balanceStepUp.plus(balanceStepUp.times(r));
+      balanceStepUp = balanceStepUp.plus(currentStepUpP).times(r.plus(1));
 
-      // Normal accumulation
-      investedNormal = investedNormal.plus(P_initial);
-      balanceNormal = balanceNormal.plus(P_initial);
-      balanceNormal = balanceNormal.plus(balanceNormal.times(r));
+      investedNormal = investedNormal.plus(monthlyInvestment);
+      balanceNormal = balanceNormal.plus(monthlyInvestment).times(r.plus(1));
 
-      // Capture yearly data
       if (month % 12 === 0) {
         yearlyBreakdown.push({
           year: month / 12,
@@ -54,10 +52,35 @@ export const useFinance = () => {
     return {
       summary: {
         stepUpSip: { totalValue: balanceStepUp.toFixed(2) },
-        normalSip: { totalValue: balanceNormal.toFixed(2) },
-        extraWealth: balanceStepUp.minus(balanceNormal).toFixed(2)
+        normalSip: { totalValue: balanceNormal.toFixed(2) }
       },
       breakdown: yearlyBreakdown
+    };
+  };
+
+  const calculateLumpsum = (amount, rate, years) => {
+    const P = new Decimal(amount || 0);
+    const r = new Decimal(rate || 0).div(100);
+    const n = new Decimal(years || 0);
+
+    // Formula: A = P * (1 + r)^n
+    const maturityValue = P.times(new Decimal(1).plus(r).pow(n));
+
+    const breakdown = [];
+    for (let i = 1; i <= years; i++) {
+      const val = P.times(new Decimal(1).plus(r).pow(i));
+      breakdown.push({
+        name: `Year ${i}`,
+        Invested: P.toNumber(),
+        TotalValue: val.toNumber()
+      });
+    }
+
+    return {
+      maturityValue: maturityValue.toFixed(2),
+      totalInvested: P.toFixed(2),
+      interestEarned: maturityValue.minus(P).toFixed(2),
+      breakdown
     };
   };
 
@@ -160,5 +183,5 @@ export const useFinance = () => {
       breakdown: chartBreakdown // Added for the chart
     };
   }
-  return { calculateSIP, calculateRD, calculateLoan };
+  return { calculateSIP, calculateRD, calculateLoan, calculateLumpsum };
 };

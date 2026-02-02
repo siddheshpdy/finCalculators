@@ -2,29 +2,33 @@ import React, { useState, useMemo } from 'react';
 import { useFinance } from '../hooks/useFinance';
 import WealthChart from './WealthChart';
 
-const WealthPlanner = () => {
-  const { calculateSIP, calculateRD, calculateLoan } = useFinance();
+const Wealth = () => {
+  const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum } = useFinance();
   const [currentMenu, setCurrentMenu] = useState('SIP'); // 'SIP', 'RD', 'Loan'
   const [activeTab, setActiveTab] = useState('primary'); // For comparison views
   const [activeStrategy, setActiveStrategy] = useState('percent'); // For SIP Step-up
 
   const [inputs, setInputs] = useState({
-    sip: { amount: 5000, rate: 12, years: 10, stepUpPercent: 10, stepUpValue: 0 },
+    sip: { amount: 5000, rate: 12, years: 10, stepUpPercent: 10, stepUpValue: 0, initialLumpsum: 0 },
+    lumpsum: { amount: 100000, rate: 12, years: 10 },
     rd: { monthlyDeposit: 5000, rate: 7, quarters: 20 },
     loan: { principal: 1000000, rate: 8.5, months: 120, yearlyExtra: 0 } // Add yearlyExtra
   });
 
   // 1. Unified Calculation Engine
-  // Inside WealthPlanner.jsx
+  // Inside Wealth.jsx
 const results = useMemo(() => {
   if (currentMenu === 'SIP') {
     return calculateSIP(
       inputs.sip.amount, inputs.sip.rate, inputs.sip.years,
       activeStrategy === 'percent' ? inputs.sip.stepUpPercent : 0,
-      activeStrategy === 'fixed' ? inputs.sip.stepUpValue : 0
+      activeStrategy === 'fixed' ? inputs.sip.stepUpValue : 0,
+      inputs.sip.initialLumpsum
     );
   } else if (currentMenu === 'RD') {
     return calculateRD(inputs.rd.monthlyDeposit, inputs.rd.rate, inputs.rd.quarters);
+  } else if (currentMenu === 'Lumpsum') {
+    return calculateLumpsum(inputs.lumpsum.amount, inputs.lumpsum.rate, inputs.lumpsum.years);
   } else {
     // FIX: Pass the 4th argument (yearlyExtra) here
     return calculateLoan(
@@ -52,15 +56,19 @@ const results = useMemo(() => {
   }, [results, currentMenu, activeTab]);
 
   return (
-    <div style={{ backgroundColor: '#F1F5F9', minHeight: '100vh', padding: '40px' }}>
-      <div style={containerStyle}>
+    <div style={{ height: '100%', width: '100%', backgroundColor: '#F1F5F9', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', margin: '0 auto', height: '100%' }}>
+        {/* Left Sidebar */}
+        <aside style={{ ...sidebarStyle, height: '100%', boxSizing: 'border-box' }}>
+          <h2 style={{ color: '#E6EEF1', margin: 0, marginBottom: '8px', fontSize: '18px' }}>Calculators</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '18px' }}>
+            {['SIP', 'Lumpsum', 'RD', 'Loan'].map(m => (
+              <button key={m} onClick={() => setCurrentMenu(m)} style={sidebarBtn(currentMenu === m)}>{m}</button>
+            ))}
+          </div>
+        </aside>
 
-        {/* Navigation Menu */}
-        <div style={menuBar}>
-          {['SIP', 'RD', 'Loan'].map(m => (
-            <button key={m} onClick={() => setCurrentMenu(m)} style={menuTab(currentMenu === m)}>{m} Planner</button>
-          ))}
-        </div>
+        <div style={{ ...containerStyle, height: '100%', overflowY: 'auto' }}>
 
         <div style={controlGrid}>
           {/* Left: Input Section */}
@@ -68,12 +76,25 @@ const results = useMemo(() => {
             <p style={cardHeading}>{currentMenu} Details</p>
             {currentMenu === 'SIP' && (
               <>
+                <DualInput label="Initial Lumpsum" symbol="₹" value={inputs.sip.initialLumpsum} min={0} max={1000000} step={5000}
+               onChange={(v) => setInputs({...inputs, sip: {...inputs.sip, initialLumpsum: v}})} />
                 <DualInput label="Monthly SIP" symbol="₹" value={inputs.sip.amount} min={500} max={100000} step={500}
-                  onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, amount: v } })} />
+               onChange={(v) => setInputs({...inputs, sip: {...inputs.sip, amount: v}})} />
                 <DualInput label="Expected Return" symbol="%" value={inputs.sip.rate} min={1} max={30} step={0.5}
                   onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, rate: v } })} />
                 <DualInput label="Tenure" symbol="Yrs" value={inputs.sip.years} min={1} max={40} step={1}
                   onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, years: v } })} />
+              </>
+            )}
+            {/* Lumpsum Input View */}
+            {currentMenu === 'Lumpsum' && (
+              <>
+                <DualInput label="Total Investment" symbol="₹" value={inputs.lumpsum.amount} min={5000} max={10000000} step={5000}
+                          onChange={(v) => setInputs({...inputs, lumpsum: {...inputs.lumpsum, amount: v}})} />
+                <DualInput label="Expected Return" symbol="%" value={inputs.lumpsum.rate} min={1} max={30} step={0.5}
+                          onChange={(v) => setInputs({...inputs, lumpsum: {...inputs.lumpsum, rate: v}})} />
+                <DualInput label="Tenure" symbol="Yrs" value={inputs.lumpsum.years} min={1} max={40} step={1}
+                          onChange={(v) => setInputs({...inputs, lumpsum: {...inputs.lumpsum, years: v}})} />
               </>
             )}
             {currentMenu === 'RD' && (
@@ -138,6 +159,13 @@ const results = useMemo(() => {
               <>
                 <ResultCard active={activeTab === 'primary'} label="STEP-UP MATURITY" color="#10B981" value={results.summary.stepUpSip.totalValue} onClick={() => setActiveTab('primary')} />
                 <ResultCard active={activeTab === 'secondary'} label="NORMAL MATURITY" color="#3B82F6" value={results.summary.normalSip.totalValue} onClick={() => setActiveTab('secondary')} />
+              </>
+            )}
+            {/* Lumpsum Result Cards */}
+            {currentMenu === 'Lumpsum' && (
+              <>
+                <ResultCard active label="MATURITY VALUE" color="#10B981" value={results.maturityValue} />
+                <ResultCard active={false} label="TOTAL INVESTED" color="#64748B" value={results.totalInvested} />
               </>
             )}
             {currentMenu === 'RD' && (
@@ -232,6 +260,7 @@ const results = useMemo(() => {
         )}
       </div>
     </div>
+    </div>
   );
 };
 
@@ -258,9 +287,9 @@ const ResultCard = ({ active, label, color, value, onClick }) => (
 );
 
 // --- Styles ---
-const containerStyle = { maxWidth: '1200px', margin: '0 auto', backgroundColor: 'white', padding: '40px', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)' };
-const menuBar = { display: 'flex', gap: '10px', marginBottom: '30px', borderBottom: '1px solid #F1F5F9', paddingBottom: '15px' };
-const menuTab = (active) => ({ padding: '10px 20px', border: 'none', borderRadius: '12px', backgroundColor: active ? '#1E293B' : 'transparent', color: active ? 'white' : '#64748B', fontWeight: '600', cursor: 'pointer' });
+const containerStyle = { height: '100%', width: '100%', backgroundColor: 'white', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)' };
+const sidebarStyle = { width: '220px', background: 'linear-gradient(180deg,#0b1220,#0f172a)', padding: '28px', boxShadow: '0 20px 40px rgba(2,6,23,0.5)', display: 'flex', flexDirection: 'column' };
+const sidebarBtn = (active) => ({ padding: '12px 18px', border: 'none', borderRadius: '999px', backgroundColor: active ? '#10B981' : 'transparent', color: active ? 'white' : '#CBD5E1', fontWeight: 700, textAlign: 'left', cursor: 'pointer', boxShadow: active ? '0 6px 18px rgba(16,185,129,0.18)' : 'none' });
 const controlGrid = { display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: '25px', marginBottom: '30px' };
 const innerCard = { padding: '24px', borderRadius: '16px', border: '1px solid #F1F5F9', backgroundColor: '#FFFFFF' };
 const cardHeading = { fontSize: '13px', fontWeight: '700', color: '#64748B', marginBottom: '20px', textTransform: 'uppercase' };
@@ -273,4 +302,4 @@ const toggleWrapper = { display: 'inline-flex', backgroundColor: '#F1F5F9', padd
 const toggleBtn = (active) => ({ padding: '6px 16px', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', backgroundColor: active ? '#3B82F6' : 'transparent', color: active ? 'white' : '#64748B' });
 const tableStyle = { width: '100%', borderCollapse: 'collapse' }; const thStyle = { padding: '12px 8px' };
 const tdStyle = { padding: '12px 8px' };
-export default WealthPlanner;
+export default Wealth;
