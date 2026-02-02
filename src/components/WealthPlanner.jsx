@@ -56,15 +56,19 @@ const results = useMemo(() => {
   }, [results, currentMenu, activeTab]);
 
   return (
-    <div style={{ backgroundColor: '#F1F5F9', minHeight: '100vh', padding: '40px' }}>
-      <div style={containerStyle}>
+    <div style={{ height: '100%', width: '100%', backgroundColor: '#F1F5F9', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', margin: '0 auto', height: '100%' }}>
+        {/* Left Sidebar */}
+        <aside style={{ ...sidebarStyle, height: '100%', boxSizing: 'border-box' }}>
+          <h2 style={{ color: '#E6EEF1', margin: 0, marginBottom: '8px', fontSize: '18px' }}>Calculators</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '18px' }}>
+            {['SIP', 'Lumpsum', 'RD', 'Loan'].map(m => (
+              <button key={m} onClick={() => setCurrentMenu(m)} style={sidebarBtn(currentMenu === m)}>{m}</button>
+            ))}
+          </div>
+        </aside>
 
-        {/* Navigation Menu */}
-        <div style={menuBar}>
-          {['SIP', 'Lumpsum', 'RD', 'Loan'].map(m => (
-            <button key={m} onClick={() => setCurrentMenu(m)} style={menuTab(currentMenu === m)}>{m}</button>
-          ))}
-        </div>
+        <div style={{ ...containerStyle, height: '100%', overflowY: 'auto' }}>
 
         <div style={controlGrid}>
           {/* Left: Input Section */}
@@ -256,6 +260,7 @@ const results = useMemo(() => {
         )}
       </div>
     </div>
+    </div>
   );
 };
 
@@ -282,9 +287,9 @@ const ResultCard = ({ active, label, color, value, onClick }) => (
 );
 
 // --- Styles ---
-const containerStyle = { maxWidth: '1200px', margin: '0 auto', backgroundColor: 'white', padding: '40px', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)' };
-const menuBar = { display: 'flex', gap: '10px', marginBottom: '30px', borderBottom: '1px solid #F1F5F9', paddingBottom: '15px' };
-const menuTab = (active) => ({ padding: '10px 20px', border: 'none', borderRadius: '12px', backgroundColor: active ? '#1E293B' : 'transparent', color: active ? 'white' : '#64748B', fontWeight: '600', cursor: 'pointer' });
+const containerStyle = { height: '100%', width: '100%', backgroundColor: 'white', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)' };
+const sidebarStyle = { width: '220px', background: 'linear-gradient(180deg,#0b1220,#0f172a)', padding: '28px', boxShadow: '0 20px 40px rgba(2,6,23,0.5)', display: 'flex', flexDirection: 'column' };
+const sidebarBtn = (active) => ({ padding: '12px 18px', border: 'none', borderRadius: '999px', backgroundColor: active ? '#10B981' : 'transparent', color: active ? 'white' : '#CBD5E1', fontWeight: 700, textAlign: 'left', cursor: 'pointer', boxShadow: active ? '0 6px 18px rgba(16,185,129,0.18)' : 'none' });
 const controlGrid = { display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: '25px', marginBottom: '30px' };
 const innerCard = { padding: '24px', borderRadius: '16px', border: '1px solid #F1F5F9', backgroundColor: '#FFFFFF' };
 const cardHeading = { fontSize: '13px', fontWeight: '700', color: '#64748B', marginBottom: '20px', textTransform: 'uppercase' };
