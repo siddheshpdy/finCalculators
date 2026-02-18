@@ -6,7 +6,7 @@ import ResultCard from './ResultCard';
 import styles from './WealthPlanner.module.css';
 
 const Wealth = () => {
-  const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum } = useFinance();
+  const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP } = useFinance();
   const [currentMenu, setCurrentMenu] = useState('SIP'); // 'SIP', 'RD', 'Loan'
   const [activeTab, setActiveTab] = useState('primary'); // For comparison views
   const [activeStrategy, setActiveStrategy] = useState('percent'); // For SIP Step-up
@@ -16,9 +16,10 @@ const Wealth = () => {
     sip: { amount: 5000, rate: 12, years: 10, stepUpPercent: 10, stepUpValue: 0, initialLumpsum: 0, inflationRate: 6 },
     lumpsum: { amount: 100000, rate: 12, years: 10 },
     rd: { monthlyDeposit: 5000, rate: 7, quarters: 20 },
-    loan: { principal: 1000000, rate: 8.5, months: 120, yearlyExtra: 0, monthlyExtra: 0 }
+    loan: { principal: 1000000, rate: 8.5, months: 120, yearlyExtra: 0, monthlyExtra: 0 },
+    swp: { initialCorpus: 10000000, monthlyWithdrawal: 50000, annualRate: 8, stepUpPercent: 0 }
   });
-
+  
   // 1. Unified Calculation Engine
   // Inside Wealth.jsx
   const results = useMemo(() => {
@@ -34,6 +35,8 @@ const Wealth = () => {
       return calculateRD(inputs.rd.monthlyDeposit, inputs.rd.rate, inputs.rd.quarters);
     } else if (currentMenu === 'Lumpsum') {
       return calculateLumpsum(inputs.lumpsum.amount, inputs.lumpsum.rate, inputs.lumpsum.years);
+    } else if (currentMenu === 'SWP') {
+      return calculateSWP(inputs.swp.initialCorpus, inputs.swp.monthlyWithdrawal, inputs.swp.annualRate, inputs.swp.stepUpPercent);
     } else {
       return calculateLoan(
         inputs.loan.principal,
@@ -43,7 +46,7 @@ const Wealth = () => {
         loanPrepaymentStrategy === 'monthly' ? inputs.loan.monthlyExtra : 0
       );
     }
-  }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, calculateSIP, calculateRD, calculateLoan, calculateLumpsum]);
+  }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP]);
   // 2. Chart Data Mapper
   const chartData = useMemo(() => {
     if (currentMenu === 'SIP') {
@@ -81,8 +84,28 @@ const Wealth = () => {
       data.unshift({ name: 'Start', 'With Prepayment': inputs.loan.principal, 'Without Prepayment': inputs.loan.principal });
       return data;
     }
+    if (currentMenu === 'SWP' && results.breakdownWithStepUp) {
+      const withStepUp = results.breakdownWithStepUp;
+      const withoutStepUp = results.breakdownWithoutStepUp;
+      const maxYears = Math.max(withStepUp.length, withoutStepUp.length);
+      const data = [];
+
+      const withMap = new Map(withStepUp.map(i => [i.name, i.TotalValue]));
+      const withoutMap = new Map(withoutStepUp.map(i => [i.name, i.TotalValue]));
+
+      for (let i = 0; i < maxYears; i++) {
+        const yearName = `Year ${i + 1}`;
+        data.push({
+          name: yearName,
+          'Stepped-Up Withdrawal': withMap.get(yearName) ?? 0,
+          'Fixed Withdrawal': withoutMap.get(yearName) ?? 0,
+        });
+      }
+      data.unshift({ name: 'Start', 'Stepped-Up Withdrawal': inputs.swp.initialCorpus, 'Fixed Withdrawal': inputs.swp.initialCorpus });
+      return data;
+    }
     return [];
-  }, [results, currentMenu, activeTab, inputs.loan.principal]);
+  }, [results, currentMenu, activeTab, inputs.loan.principal, inputs.swp.initialCorpus]);
 
   return (
     <div className={styles.wealthPlannerRoot}>
@@ -91,7 +114,7 @@ const Wealth = () => {
         <aside className={styles.sidebar}>
           <h2 className={styles.sidebarTitle}>Calculators</h2>
           <div className={styles.sidebarMenu}>
-            {['SIP', 'Lumpsum', 'RD', 'Loan'].map(m => (
+            {['SIP', 'Lumpsum', 'RD', 'Loan', 'SWP'].map(m => (
               <button key={m} onClick={() => setCurrentMenu(m)} className={`${styles.sidebarBtn} ${currentMenu === m ? styles.sidebarBtnActive : ''}`}>{m}</button>
             ))}
           </div>
@@ -148,6 +171,16 @@ const Wealth = () => {
                     onChange={(v) => setInputs({ ...inputs, loan: { ...inputs.loan, months: v } })} />
                 </>
               )}
+              {currentMenu === 'SWP' && (
+                <>
+                  <DualInput label="Initial Corpus" symbol="₹" value={inputs.swp.initialCorpus} min={100000} max={50000000} step={100000}
+                    onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, initialCorpus: v } })} />
+                  <DualInput label="Monthly Withdrawal" symbol="₹" value={inputs.swp.monthlyWithdrawal} min={1000} max={200000} step={1000}
+                    onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, monthlyWithdrawal: v } })} />
+                  <DualInput label="Expected Return" symbol="%" value={inputs.swp.annualRate} min={1} max={20} step={0.5}
+                    onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, annualRate: v } })} />
+                </>
+              )}
             </div>
 
             {/* Middle: Strategy/Extra Options */}
@@ -189,6 +222,20 @@ const Wealth = () => {
                   ) : (
                     <DualInput label="Fixed Increase" symbol="₹" value={inputs.sip.stepUpValue} min={0} max={50000} onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, stepUpValue: v } })} />
                   )}
+                </>
+              ) : currentMenu === 'SWP' ? (
+                <>
+                  <p className={styles.cardHeading}>Step-Up Withdrawal</p>
+                  <DualInput
+                    label="Annual Step-up"
+                    symbol="%"
+                    value={inputs.swp.stepUpPercent}
+                    min={0} max={10} step={0.5}
+                    onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, stepUpPercent: v } })}
+                  />
+                  <p style={{ fontSize: '12px', color: '#64748B', marginTop: '10px' }}>
+                    Increase withdrawal amount annually to counter inflation.
+                  </p>
                 </>
               ) : (
                 <p className={styles.noStrategyText}>No additional strategy available for this mode.</p>
@@ -243,14 +290,23 @@ const Wealth = () => {
                   </div>
                 </>
               )}
+              {currentMenu === 'SWP' && results && (
+                <>
+                  <ResultCard active label="Corpus Lasts For" color="#3B82F6" value={`${Math.floor(results.monthsLasted / 12)}Y ${results.monthsLasted % 12}M`} />
+                  <ResultCard active={false} label="Total Withdrawn" color="#10B981" value={results.totalWithdrawn} />
+                  <ResultCard active={false} label="Final Balance" color="#64748B" value={results.finalBalance} />
+                </>
+              )}
             </div>
           </div>
 
           {/* Chart View */}
-          {(currentMenu === 'SIP' || currentMenu === 'RD' || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
+          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
             <div className={`${styles.innerCard} ${styles.chartContainer}`}>
               <p className={styles.cardHeading}>
-                {currentMenu === 'Loan'
+                {currentMenu === 'SWP'
+                  ? 'Corpus Depletion Over Time'
+                  : currentMenu === 'Loan'
                   ? 'Loan Balance Over Time'
                   : currentMenu === 'SIP'
                     ? (activeTab === 'primary' ? 'Step-Up' : 'Normal') + ' Wealth Projection'
@@ -268,6 +324,17 @@ const Wealth = () => {
                   secondaryColor="#EF4444"
                   hideInvestedLine={true}
                 />
+              ) : currentMenu === 'SWP' ? (
+                <WealthChart
+                  data={chartData}
+                  primaryDataKey={inputs.swp.stepUpPercent > 0 ? "Stepped-Up Withdrawal" : "Fixed Withdrawal"}
+                  primaryName={inputs.swp.stepUpPercent > 0 ? "Stepped-Up Withdrawal" : "Remaining Corpus"}
+                  primaryColor="#EF4444"
+                  secondaryDataKey={inputs.swp.stepUpPercent > 0 ? "Fixed Withdrawal" : undefined}
+                  secondaryName="Fixed Withdrawal"
+                  secondaryColor="#64748B"
+                  hideInvestedLine={true}
+                />
               ) : (
                 <WealthChart
                   data={chartData}
@@ -281,17 +348,40 @@ const Wealth = () => {
           )}
 
           {/* Dynamic Breakdown Table */}
-          {(currentMenu === 'SIP' || currentMenu === 'RD' || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
+          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
             <div className={styles.innerCard}>
               <p className={styles.cardHeading}>
-                {currentMenu === 'Loan'
+                {currentMenu === 'SWP'
+                  ? 'Corpus Depletion Schedule'
+                  : currentMenu === 'Loan'
                   ? 'Loan Repayment Schedule'
                   : `${currentMenu} ${currentMenu === 'SIP' && (activeTab === 'primary' ? 'Step-Up' : 'Normal')} Breakdown Schedule`
                 }
               </p>
               <div className={styles.tableWrapper}>
                 <table className={styles.table}>
-                  {currentMenu === 'Loan' ? (
+                  {currentMenu === 'SWP' ? (
+                    <>
+                      <thead>
+                        <tr>
+                          <th className={styles.th}>Year</th>
+                          {inputs.swp.stepUpPercent > 0 && <th className={styles.th}>Corpus (Fixed)</th>}
+                          <th className={styles.th}>Corpus ({inputs.swp.stepUpPercent > 0 ? 'Stepped-Up' : 'Fixed'})</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chartData.filter(d => d.name !== 'Start').map((row, index) => (
+                          <tr key={index}>
+                            <td className={styles.td}>{row.name.replace(/Year |Yr /g, '')}</td>
+                            {inputs.swp.stepUpPercent > 0 && <td className={styles.td}>₹{Number(row['Fixed Withdrawal']).toLocaleString('en-IN')}</td>}
+                            <td className={`${styles.td} ${styles.tdMaturity}`} style={{ color: '#EF4444' }}>
+                              ₹{Number(row['Stepped-Up Withdrawal'] ?? row['Fixed Withdrawal']).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  ) : currentMenu === 'Loan' ? (
                     <>
                       <thead>
                         <tr>
@@ -367,7 +457,7 @@ const Wealth = () => {
         </div>
       </div>
     </div>
-  )
+  );
 };
 
 export default Wealth;

@@ -175,6 +175,79 @@ export const useFinance = () => {
     };
   };
 
+  const calculateSWP = (initialCorpus, monthlyWithdrawal, annualRate, stepUpPercent = 0) => {
+    const swpAmortize = (corpus, initialWithdrawal, rate, stepUp) => {
+      let remainingCorpus = new Decimal(corpus);
+      let withdrawal = new Decimal(initialWithdrawal);
+      let totalWithdrawn = new Decimal(0);
+      let months = 0;
+      const breakdown = [];
+      const maxMonths = 600; // 50-year cap
+
+      if (remainingCorpus.lte(0) || withdrawal.lte(0)) {
+        return { monthsLasted: 0, totalWithdrawn: new Decimal(0), finalBalance: remainingCorpus, breakdown: [] };
+      }
+
+      for (let m = 1; m <= maxMonths; m++) {
+          if (remainingCorpus.lte(0)) break;
+
+          if (m > 1 && (m - 1) % 12 === 0 && stepUp.gt(0)) {
+            withdrawal = withdrawal.times(new Decimal(1).plus(stepUp));
+          }
+
+          const interestEarned = remainingCorpus.times(rate);
+          remainingCorpus = remainingCorpus.plus(interestEarned);
+
+          let actualWithdrawal = withdrawal;
+          if (remainingCorpus.lt(withdrawal)) {
+              actualWithdrawal = remainingCorpus;
+          }
+          
+          remainingCorpus = remainingCorpus.minus(actualWithdrawal);
+          totalWithdrawn = totalWithdrawn.plus(actualWithdrawal);
+          months = m;
+
+          if (m % 12 === 0) {
+              breakdown.push({
+                  name: `Year ${m / 12}`,
+                  TotalValue: remainingCorpus.toNumber(),
+              });
+          }
+          
+          if (remainingCorpus.lte(0)) {
+              if (m % 12 !== 0) {
+                   breakdown.push({ name: `Year ${Math.ceil(m / 12)}`, TotalValue: 0 });
+              }
+              break;
+          }
+      }
+      return { monthsLasted: months, totalWithdrawn, finalBalance: remainingCorpus, breakdown };
+    };
+
+    const r = new Decimal(annualRate || 0).div(100).div(12);
+    const stepUp = new Decimal(stepUpPercent || 0).div(100);
+
+    const resWithStepUp = swpAmortize(initialCorpus, monthlyWithdrawal, r, stepUp);
+    const resWithoutStepUp = swpAmortize(initialCorpus, monthlyWithdrawal, r, new Decimal(0));
+
+    return {
+        // Primary results are from the user-selected scenario (with step-up if provided)
+        monthsLasted: resWithStepUp.monthsLasted,
+        totalWithdrawn: resWithStepUp.totalWithdrawn.toFixed(2),
+        finalBalance: resWithStepUp.finalBalance.toFixed(2),
+        
+        // Breakdowns for chart and table
+        breakdownWithStepUp: resWithStepUp.breakdown,
+        breakdownWithoutStepUp: resWithoutStepUp.breakdown,
+
+        // Store fixed results for easy access if needed
+        fixedResults: {
+            monthsLasted: resWithoutStepUp.monthsLasted,
+            totalWithdrawn: resWithoutStepUp.totalWithdrawn.toFixed(2),
+            finalBalance: resWithoutStepUp.finalBalance.toFixed(2),
+        }
+    };
+  };
 
   // Recurring Deposit (RD): M = P * [(1+r)^n - 1] / [1 - (1+r)^(-1/3)]
   // Note: RD usually uses quarterly compounding in many regions
@@ -217,5 +290,5 @@ export const useFinance = () => {
       breakdown: chartBreakdown // Added for the chart
     };
   }
-  return { calculateSIP, calculateRD, calculateLoan, calculateLumpsum };
+  return { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP };
 };
