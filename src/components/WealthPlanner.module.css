@@ -1,0 +1,183 @@
+.wealthPlannerRoot {
+  height: 100%;
+  width: 100%;
+  background-color: #F1F5F9;
+  box-sizing: border-box;
+  overflow: clip;
+}
+
+.mainContent {
+  display: flex;
+  margin: 0 auto;
+  height: 100%;
+}
+
+.sidebar {
+  width: 220px;
+  background: linear-gradient(180deg, #0b1220, #0f172a);
+  padding: 28px;
+  box-shadow: 0 20px 40px rgba(2, 6, 23, 0.5);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+}
+
+.sidebarTitle {
+  color: #E6EEF1;
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.sidebarMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.sidebarBtn {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background-color: transparent;
+  color: #CBD5E1;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.sidebarBtnActive {
+  background-color: #10B981;
+  color: white;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.18);
+}
+
+.mainPanel {
+  height: 100%;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.controlGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.2fr;
+  gap: 25px;
+  margin-bottom: 30px;
+}
+
+.innerCard {
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid #F1F5F9;
+  background-color: #FFFFFF;
+}
+
+.cardHeading {
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748B;
+  margin: 0 0 20px 0;
+  text-transform: uppercase;
+}
+
+.toggleWrapper {
+  display: inline-flex;
+  background-color: #F1F5F9;
+  padding: 4px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.toggleBtn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: transparent;
+  color: #64748B;
+}
+
+.toggleBtnActive {
+  background-color: #3B82F6;
+  color: white;
+}
+
+.noStrategyText {
+  color: #94A3B8;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 40%;
+}
+
+.resultsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.totalPaidCard {
+  padding: 20px;
+  border-radius: 16px;
+  border: 2px solid #F1F5F9;
+  background-color: #F8FAFC;
+  margin-top: 10px;
+}
+
+.labelSmall {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94A3B8;
+  margin: 0 0 5px 0;
+}
+
+.valueLarge {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0;
+}
+
+.savedMonths {
+  color: #10B981;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.chartContainer {
+  margin-bottom: 30px;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.th {
+  padding: 12px 8px;
+  text-align: left;
+  color: #64748B;
+  font-size: 13px;
+  font-weight: normal; /* Override default <th> bold */
+}
+
+.td {
+  padding: 12px 8px;
+  border-top: 1px solid #F1F5F9;
+  font-size: 14px;
+  color: #1E293B;
+}
+
+.tdMaturity {
+  font-weight: 600;
+}

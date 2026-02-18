@@ -2,9 +2,10 @@ import Decimal from 'decimal.js';
 
 export const useFinance = () => {
   // Add/Update these inside useFinance.js
-  const calculateSIP = (monthlyInvestment, annualRate, years, stepUpPercent = 0, stepUpValue = 0, initialLumpsum = 0) => {
+  const calculateSIP = (monthlyInvestment, annualRate, years, stepUpPercent = 0, stepUpValue = 0, initialLumpsum = 0, inflationRate = 0) => {
     const r = new Decimal(annualRate || 0).div(100).div(12);
     const totalMonths = (years || 0) * 12;
+    const i = new Decimal(inflationRate || 0).div(100); // inflation rate per year
 
     // Start the balance with the initial lumpsum
     let balanceStepUp = new Decimal(initialLumpsum || 0);
@@ -34,25 +35,43 @@ export const useFinance = () => {
       balanceNormal = balanceNormal.plus(monthlyInvestment).times(r.plus(1));
 
       if (month % 12 === 0) {
+        const currentYear = month / 12;
+        const inflationDivisor = new Decimal(1).plus(i).pow(currentYear);
+
+        const adjustedStepUpValue = balanceStepUp.div(inflationDivisor);
+        const adjustedNormalValue = balanceNormal.div(inflationDivisor);
+
         yearlyBreakdown.push({
-          year: month / 12,
+          year: currentYear,
           stepUp: {
             monthlyInstallment: currentStepUpP.toFixed(2),
             investedAmount: investedStepUp.toFixed(2),
-            totalValue: balanceStepUp.toFixed(2)
+            totalValue: balanceStepUp.toFixed(2),
+            adjustedTotalValue: adjustedStepUpValue.toFixed(2)
           },
           normal: {
             investedAmount: investedNormal.toFixed(2),
-            totalValue: balanceNormal.toFixed(2)
+            totalValue: balanceNormal.toFixed(2),
+            adjustedTotalValue: adjustedNormalValue.toFixed(2)
           }
         });
       }
     }
 
+    const finalInflationDivisor = new Decimal(1).plus(i).pow(years);
+    const finalAdjustedStepUp = balanceStepUp.div(finalInflationDivisor);
+    const finalAdjustedNormal = balanceNormal.div(finalInflationDivisor);
+
     return {
       summary: {
-        stepUpSip: { totalValue: balanceStepUp.toFixed(2) },
-        normalSip: { totalValue: balanceNormal.toFixed(2) }
+        stepUpSip: {
+          totalValue: balanceStepUp.toFixed(2),
+          inflationAdjustedValue: finalAdjustedStepUp.toFixed(2)
+        },
+        normalSip: {
+          totalValue: balanceNormal.toFixed(2),
+          inflationAdjustedValue: finalAdjustedNormal.toFixed(2)
+        }
       },
       breakdown: yearlyBreakdown
     };
@@ -85,59 +104,74 @@ export const useFinance = () => {
   };
 
   // Loan EMI: [P x r x (1+r)^n] / [(1+r)^n - 1]
-  const calculateLoan = (principal, annualRate, months, yearlyExtra = 0) => {
-    const P_init = new Decimal(principal);
+  const calculateLoan = (principal, annualRate, months, yearlyExtra = 0, monthlyExtra = 0) => {
+    const P_init = new Decimal(principal || 0);
     const r = new Decimal(annualRate).div(100).div(12);
-    const totalMonths = new Decimal(months).toNumber();
-    const extra = new Decimal(yearlyExtra || 0);
+    const totalMonths_orig = new Decimal(months).toNumber();
+    const extraYearly = new Decimal(yearlyExtra || 0);
+    const extraMonthly = new Decimal(monthlyExtra || 0);
 
-    // Calculate Standard EMI (Standard formula)
-    const onePlusRToN = r.plus(1).pow(totalMonths);
+    // Standard EMI is calculated once and is constant
+    const onePlusRToN = r.plus(1).pow(totalMonths_orig);
     const emi = P_init.times(r).times(onePlusRToN).div(onePlusRToN.minus(1));
 
-    let remainingPrincipal = P_init;
-    let totalInterestPaid = new Decimal(0);
-    let actualMonths = 0;
-    const breakdown = [];
+    // --- Amortization Calculator ---
+    const amortize = (P, rate, totalMonths, monthlyEMI, yearlyExtraPayment, monthlyExtraPayment) => {
+      let remainingPrincipal = new Decimal(P);
+      let totalInterestPaid = new Decimal(0);
+      let actualMonths = 0;
+      const breakdown = [];
 
-    for (let m = 1; m <= totalMonths; m++) {
-      if (remainingPrincipal.lte(0)) break;
+      for (let m = 1; m <= totalMonths; m++) {
+        if (remainingPrincipal.lte(0)) break;
 
-      const interestForMonth = remainingPrincipal.times(r);
-      let principalPaid = emi.minus(interestForMonth);
+        const interestForMonth = remainingPrincipal.times(rate);
+        let principalPaid = monthlyEMI.minus(interestForMonth);
 
-      // Add extra installment every 12 months
-      if (m > 0 && m % 12 === 0) {
-        principalPaid = principalPaid.plus(extra);
+        // Add extra monthly payment
+        principalPaid = principalPaid.plus(monthlyExtraPayment);
+
+        // Add extra yearly installment every 12 months
+        if (yearlyExtraPayment.gt(0) && m > 0 && m % 12 === 0) {
+          principalPaid = principalPaid.plus(yearlyExtraPayment);
+        }
+
+        // Ensure we don't overpay
+        if (principalPaid.gt(remainingPrincipal)) {
+          principalPaid = remainingPrincipal;
+        }
+
+        remainingPrincipal = remainingPrincipal.minus(principalPaid);
+        totalInterestPaid = totalInterestPaid.plus(interestForMonth);
+        actualMonths = m;
+
+        // Capture yearly snapshot
+        if (m % 12 === 0 || remainingPrincipal.lte(0)) {
+          breakdown.push({
+            year: Math.ceil(m / 12),
+            remainingBalance: remainingPrincipal.toNumber()
+          });
+        }
       }
+      const totalPaid = P.plus(totalInterestPaid);
+      return { breakdown, totalInterestPaid, totalPaid, actualMonths };
+    };
 
-      // Ensure we don't overpay the last bit
-      if (principalPaid.gt(remainingPrincipal)) {
-        principalPaid = remainingPrincipal;
-      }
-
-      remainingPrincipal = remainingPrincipal.minus(principalPaid);
-      totalInterestPaid = totalInterestPaid.plus(interestForMonth);
-      actualMonths = m;
-
-      // Capture yearly snapshot for chart/table
-      if (m % 12 === 0 || remainingPrincipal.lte(0)) {
-        breakdown.push({
-          name: `Year ${Math.ceil(m / 12)}`,
-          Invested: P_init.minus(remainingPrincipal).toNumber(), // Principal repaid
-          TotalValue: remainingPrincipal.toNumber() // Remaining balance
-        });
-      }
-    }
-
-    const totalPaid = P_init.plus(totalInterestPaid);
+    // --- Calculate for both scenarios ---
+    const resWithoutPrepayment = amortize(P_init, r, totalMonths_orig, emi, new Decimal(0), new Decimal(0));
+    const resWithPrepayment = (yearlyExtra > 0 || monthlyExtra > 0)
+        ? amortize(P_init, r, totalMonths_orig, emi, extraYearly, extraMonthly)
+        : resWithoutPrepayment;
+    const interestSaved = resWithoutPrepayment.totalInterestPaid.minus(resWithPrepayment.totalInterestPaid);
 
     return {
       monthlyPayment: emi.toFixed(2),
-      totalInterest: totalInterestPaid.toFixed(2),
-      totalAmountPaid: totalPaid.toFixed(2), // NEW: Requirement 1
-      monthsSaved: totalMonths - actualMonths,
-      breakdown
+      totalInterest: resWithPrepayment.totalInterestPaid.toFixed(2),
+      totalAmountPaid: resWithPrepayment.totalPaid.toFixed(2),
+      monthsSaved: totalMonths_orig - resWithPrepayment.actualMonths,
+      interestSaved: interestSaved.gt(0) ? interestSaved.toFixed(2) : "0.00",
+      breakdownWithPrepayment: resWithPrepayment.breakdown,
+      breakdownWithoutPrepayment: resWithoutPrepayment.breakdown,
     };
   };
 
