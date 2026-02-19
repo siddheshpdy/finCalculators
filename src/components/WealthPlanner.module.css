@@ -181,3 +181,55 @@
 .tdMaturity {
   font-weight: 600;
 }
+
+@media (max-width: 768px) {
+  .mainContent {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    padding: 12px 16px;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .sidebarTitle {
+    display: none;
+  }
+
+  .sidebarMenu {
+    flex-direction: row;
+    margin-top: 0;
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 0;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .sidebarMenu::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidebarBtn {
+    white-space: nowrap;
+    flex: 0 0 auto;
+    font-size: 14px;
+    padding: 8px 16px;
+  }
+
+  .mainPanel {
+    padding: 16px;
+    height: auto;
+    flex: 1;
+  }
+
+  .controlGrid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
