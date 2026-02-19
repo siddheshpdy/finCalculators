@@ -4,13 +4,16 @@ import WealthChart from './WealthChart';
 import DualInput from './DualInput';
 import ResultCard from './ResultCard';
 import styles from './WealthPlanner.module.css';
+import { useEffect } from 'react';
 
 const Wealth = () => {
   const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP } = useFinance();
   const [currentMenu, setCurrentMenu] = useState('SIP'); // 'SIP', 'RD', 'Loan'
   const [activeTab, setActiveTab] = useState('primary'); // For comparison views
   const [activeStrategy, setActiveStrategy] = useState('percent'); // For SIP Step-up
+  const [savedScenarios, setSavedScenarios] = useState([]);
   const [loanPrepaymentStrategy, setLoanPrepaymentStrategy] = useState('yearly'); // For Loan Prepayment
+  const [selectedScenario, setSelectedScenario] = useState('');
 
   const [inputs, setInputs] = useState({
     sip: { amount: 5000, rate: 12, years: 10, stepUpPercent: 10, stepUpValue: 0, initialLumpsum: 0, inflationRate: 6 },
@@ -20,8 +23,86 @@ const Wealth = () => {
     swp: { initialCorpus: 10000000, monthlyWithdrawal: 50000, annualRate: 8, stepUpPercent: 0 }
   });
   
+  useEffect(() => {
+    const storedScenarios = localStorage.getItem('savedScenarios');
+    if (storedScenarios) {
+      setSavedScenarios(JSON.parse(storedScenarios));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('savedScenarios', JSON.stringify(savedScenarios));
+  }, [savedScenarios]);
+
+  useEffect(() => {
+    setSelectedScenario('');
+  }, [currentMenu]);
+
+  useEffect(() => {
+    if (selectedScenario) {
+      const scenario = savedScenarios.find(s => s.name === selectedScenario && s.menu === currentMenu);
+      if (scenario) {
+        const inputsChanged = JSON.stringify(inputs) !== JSON.stringify(scenario.inputs);
+        const strategyChanged = activeStrategy !== (scenario.activeStrategy || 'percent');
+        const loanStrategyChanged = loanPrepaymentStrategy !== (scenario.loanPrepaymentStrategy || 'yearly');
+
+        if (inputsChanged || strategyChanged || loanStrategyChanged) {
+          setSelectedScenario('');
+        }
+      }
+    }
+  }, [inputs, activeStrategy, loanPrepaymentStrategy, selectedScenario, savedScenarios, currentMenu]);
+
+  const saveScenario = () => {
+    const scenarioName = prompt("Enter scenario name:");
+    if (scenarioName) {
+      const existingIndex = savedScenarios.findIndex(s => s.name === scenarioName && s.menu === currentMenu);
+      const newScenario = {
+        name: scenarioName,
+        menu: currentMenu,
+        inputs: inputs,
+        activeTab: activeTab,
+        activeStrategy: activeStrategy,
+        loanPrepaymentStrategy: loanPrepaymentStrategy
+      };
+
+      if (existingIndex >= 0) {
+        if (window.confirm(`Scenario "${scenarioName}" already exists. Do you want to overwrite it?`)) {
+          const updatedScenarios = [...savedScenarios];
+          updatedScenarios[existingIndex] = newScenario;
+          setSavedScenarios(updatedScenarios);
+          setSelectedScenario(scenarioName);
+        }
+      } else {
+        setSavedScenarios([...savedScenarios, newScenario]);
+        setSelectedScenario(scenarioName);
+      }
+    }
+  };
+
+  const deleteScenario = () => {
+    if (selectedScenario) {
+      setSavedScenarios(prev => prev.filter(s => !(s.name === selectedScenario && s.menu === currentMenu)));
+      setSelectedScenario('');
+    }
+  };
+
+  const loadScenario = (scenario) => {
+    // To prevent issues with scenarios saved before this change
+    const scenarioInputs = scenario.inputs || {};
+    const scenarioMenu = scenario.menu || 'SIP';
+    const scenarioActiveTab = scenario.activeTab || 'primary';
+    const scenarioActiveStrategy = scenario.activeStrategy || 'percent';
+    const scenarioLoanStrategy = scenario.loanPrepaymentStrategy || 'yearly';
+
+    setInputs(scenarioInputs);
+    setCurrentMenu(scenarioMenu);
+    setActiveTab(scenarioActiveTab);
+    setActiveStrategy(scenarioActiveStrategy);
+    setLoanPrepaymentStrategy(scenarioLoanStrategy);
+  };
+
   // 1. Unified Calculation Engine
-  // Inside Wealth.jsx
   const results = useMemo(() => {
     if (currentMenu === 'SIP') {
       return calculateSIP(
@@ -47,6 +128,7 @@ const Wealth = () => {
       );
     }
   }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP]);
+
   // 2. Chart Data Mapper
   const chartData = useMemo(() => {
     if (currentMenu === 'SIP') {
@@ -125,7 +207,43 @@ const Wealth = () => {
           <div className={styles.controlGrid}>
             {/* Left: Input Section */}
             <div className={styles.innerCard}>
-              <p className={styles.cardHeading}>{currentMenu} Details</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <p className={styles.cardHeading} style={{ marginBottom: 0 }}>{currentMenu} Details</p>
+                <button onClick={saveScenario} style={{ padding: '5px 10px', fontSize: '12px', background: '#3B82F6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Save Scenario</button>
+              </div>
+              
+              {savedScenarios.some(s => s.menu === currentMenu) && (
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                  <select
+                    style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '14px', color: '#334155' }}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      setSelectedScenario(name);
+                      const s = savedScenarios.find(sc => sc.name === name && sc.menu === currentMenu);
+                      if (s) loadScenario(s);
+                    }}
+                    value={selectedScenario}
+                  >
+                    <option value="" disabled>Load a saved scenario...</option>
+                    {savedScenarios.filter(s => s.menu === currentMenu).map((s, i) => (
+                      <option key={i} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+                  <button 
+                    onClick={deleteScenario}
+                    disabled={!selectedScenario}
+                    style={{ 
+                      padding: '8px 12px', 
+                      background: selectedScenario ? '#EF4444' : '#94A3B8', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '6px', 
+                      cursor: selectedScenario ? 'pointer' : 'not-allowed' 
+                    }}
+                  >Delete</button>
+                </div>
+              )}
+
               {currentMenu === 'SIP' && (
                 <>
                   <DualInput label="Initial Lumpsum" symbol="₹" value={inputs.sip.initialLumpsum} min={0} max={1000000} step={5000}
