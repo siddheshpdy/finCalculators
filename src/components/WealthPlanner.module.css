@@ -222,6 +222,11 @@
     padding: 8px 16px;
   }
 
+  .sidebarBtnActive {
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+  }
+
   .mainPanel {
     padding: 16px;
     height: auto;
@@ -232,4 +237,66 @@
     grid-template-columns: 1fr;
     gap: 20px;
   }
+}
+
+@media (max-width: 400px) {
+  .sidebarMenu {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    justify-content: center;
+  }
+
+  .sidebarBtn {
+    flex: 1 1 auto;
+    text-align: center;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+}
+
+/* Documentation / Guide Styles */
+.guideContainer {
+  max-width: 800px;
+  margin: 0 auto;
+  color: #334155;
+  padding-bottom: 40px;
+}
+
+.guideTitle {
+  font-size: 24px;
+  color: #1E293B;
+  margin-bottom: 10px;
+}
+
+.guideIntro {
+  color: #64748B;
+  margin-bottom: 30px;
+  line-height: 1.6;
+}
+
+.guideSection {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.sectionTitle {
+  color: #0F172A;
+  margin-bottom: 10px;
+}
+
+.exampleBox {
+  background-color: #F8FAFC;
+  border-left: 4px solid #3B82F6;
+  padding: 16px;
+  margin-top: 16px;
+  border-radius: 0 8px 8px 0;
+}
+
+.formula {
+  font-family: 'Courier New', Courier, monospace;
+  background-color: #E2E8F0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
 }
