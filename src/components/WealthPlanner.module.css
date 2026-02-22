@@ -222,6 +222,11 @@
     padding: 8px 16px;
   }
 
+  .sidebarBtnActive {
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+  }
+
   .mainPanel {
     padding: 16px;
     height: auto;
@@ -231,5 +236,20 @@
   .controlGrid {
     grid-template-columns: 1fr;
     gap: 20px;
+  }
+}
+
+@media (max-width: 400px) {
+  .sidebarMenu {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    justify-content: center;
+  }
+
+  .sidebarBtn {
+    flex: 1 1 auto;
+    text-align: center;
+    font-size: 12px;
+    padding: 6px 8px;
   }
 }
