@@ -300,3 +300,205 @@
   border-radius: 4px;
   font-size: 0.9em;
 }
+
+.searchContainer {
+  margin-bottom: 15px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  margin-top: 5px;
+  box-sizing: border-box;
+}
+
+.loadingText {
+  font-size: 12px;
+  color: #666;
+}
+
+.selectedFundBox {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #e0f2fe;
+  color: #0c4a6e;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.changeBtn {
+  float: right;
+  border: none;
+  background: none;
+  color: red;
+  cursor: pointer;
+}
+
+.fetchingText {
+  margin-top: 5px;
+  color: #666;
+  font-size: 11px;
+}
+
+.inputGroup {
+  margin-bottom: 15px;
+}
+
+.label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748B;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.dateInput {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.helperText {
+  font-size: 12px;
+  color: #64748B;
+  margin-top: 10px;
+}
+
+.textRed {
+  color: #EF4444;
+}
+
+.textGreen {
+  color: #10B981;
+}
+
+.textBlue {
+  color: #3B82F6;
+}
+
+.searchHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.refreshBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #3B82F6;
+  padding: 0;
+  line-height: 1;
+}
+
+.refreshBtn:hover {
+  color: #1d4ed8;
+}
+
+.portfolioList {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.portfolioItem {
+  padding: 15px;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  background-color: #FFFFFF;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.portfolioItemInfo {
+  flex: 1;
+}
+
+.portfolioItemTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0 0 5px 0;
+}
+
+.portfolioItemSubtitle {
+  font-size: 12px;
+  color: #64748B;
+  margin: 0;
+}
+
+.portfolioActions {
+  display: flex;
+  gap: 8px;
+}
+
+.actionBtn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.editBtn {
+  color: #3B82F6;
+  border-color: #BFDBFE;
+}
+
+.editBtn:hover {
+  background-color: #EFF6FF;
+  color: #2563EB;
+}
+
+.deleteBtn {
+  color: #EF4444;
+  border-color: #FECACA;
+}
+
+.deleteBtn:hover {
+  background-color: #FEF2F2;
+  color: #DC2626;
+}
+
+.addFundBtn {
+  width: 100%;
+  padding: 12px;
+  background-color: #3B82F6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.addFundBtn:hover {
+  background-color: #2563EB;
+}
+
+.addFundBtn:disabled {
+  background-color: #94A3B8;
+  cursor: not-allowed;
+}
+
+.cancelBtn {
+  width: 100%;
+  padding: 12px;
+  background-color: transparent;
+  color: #64748B;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 10px;
+}
