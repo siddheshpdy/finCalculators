@@ -333,8 +333,9 @@ export const useFinance = () => {
   const calculateRealSIP = (navData, inputs) => {
     if (!navData || navData.length === 0) return null;
 
-    const { startDate, amount, lumpsum, stepUpPercent, stepUpValue } = inputs;
+    const { startDate, endDate, amount, lumpsum, stepUpPercent, stepUpValue } = inputs;
     const start = new Date(startDate);
+    const sipEnd = endDate ? new Date(endDate) : null;
     
     // Parse and sort NAV data (API returns newest first, we need oldest first)
     const sortedNav = navData.map(d => {
@@ -358,6 +359,7 @@ export const useFinance = () => {
     let currentSIPAmount = new Decimal(amount || 0);
     let nextSIPDate = new Date(start); 
     const xirrTransactions = [];
+    const purchaseHistory = [];
     
     // Handle Initial Lumpsum
     if (lumpsum > 0) {
@@ -366,6 +368,14 @@ export const useFinance = () => {
         currentUnits = currentUnits.plus(ls.div(firstNav));
         totalInvested = totalInvested.plus(ls);
         xirrTransactions.push({ amount: -ls.toNumber(), date: sortedNav[startIndex].date });
+        purchaseHistory.push({
+          date: sortedNav[startIndex].date,
+          dateStr: sortedNav[startIndex].dateStr,
+          type: 'Lumpsum',
+          amount: ls.toNumber(),
+          nav: firstNav.toNumber(),
+          units: ls.div(firstNav).toNumber()
+        });
     }
 
     const breakdown = [];
@@ -376,12 +386,20 @@ export const useFinance = () => {
         const day = sortedNav[i];
         
         // Check if a SIP is due (catch up if multiple dates passed)
-        if (amount > 0) {
+        if (amount > 0 && (!sipEnd || nextSIPDate <= sipEnd)) {
             while (day.date >= nextSIPDate) {
                 const units = currentSIPAmount.div(day.nav);
                 currentUnits = currentUnits.plus(units);
                 totalInvested = totalInvested.plus(currentSIPAmount);
                 xirrTransactions.push({ amount: -currentSIPAmount.toNumber(), date: day.date });
+                purchaseHistory.push({
+                  date: day.date,
+                  dateStr: day.dateStr,
+                  type: 'SIP',
+                  amount: currentSIPAmount.toNumber(),
+                  nav: day.nav.toNumber(),
+                  units: units.toNumber()
+                });
                 sipCount++;
 
                 // Step Up Logic (Annually)
@@ -431,7 +449,8 @@ export const useFinance = () => {
         totalUnits: currentUnits.toFixed(4),
         currentNAV: lastNav.toFixed(4),
         lastUpdated: sortedNav[sortedNav.length - 1].dateStr,
-        breakdown
+        breakdown,
+        purchaseHistory
     };
   };
 
@@ -449,12 +468,16 @@ export const useFinance = () => {
     let totalCurrentValue = new Decimal(0);
     let totalInvested = new Decimal(0);
     let allTransactions = [];
+    let allHistory = [];
     const dateMap = new Map();
 
     validResults.forEach(res => {
       totalCurrentValue = totalCurrentValue.plus(res.currentValue);
       totalInvested = totalInvested.plus(res.totalInvested);
       if (res.xirrTransactions) allTransactions = allTransactions.concat(res.xirrTransactions);
+      if (res.purchaseHistory) {
+        allHistory = allHistory.concat(res.purchaseHistory.map(h => ({...h, fundName: res.name})));
+      }
 
       res.breakdown.forEach(point => {
         const dateKey = point.date.getTime();
@@ -482,6 +505,8 @@ export const useFinance = () => {
         NAV: 0
       }));
 
+    allHistory.sort((a, b) => a.date - b.date);
+
     const absoluteReturn = totalInvested.gt(0) 
       ? totalCurrentValue.minus(totalInvested).div(totalInvested).times(100) 
       : new Decimal(0);
@@ -494,7 +519,8 @@ export const useFinance = () => {
       absoluteReturn: absoluteReturn.toFixed(2),
       xirr: xirr.toFixed(2),
       breakdown,
-      fundDetails: validResults
+      fundDetails: validResults,
+      purchaseHistory: allHistory
     };
   };
 

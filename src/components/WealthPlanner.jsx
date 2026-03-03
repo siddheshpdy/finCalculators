@@ -39,6 +39,7 @@ const Wealth = () => {
   const [trackerLoading, setTrackerLoading] = useState(false);
   const [trackerInputs, setTrackerInputs] = useState({
     startDate: '2020-01-01',
+    endDate: '',
     amount: 5000,
     lumpsum: 0,
     stepUpPercent: 0,
@@ -53,6 +54,7 @@ const Wealth = () => {
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [investmentMode, setInvestmentMode] = useState('SIP'); // 'SIP', 'Lumpsum', 'Both'
+  const [filterStatus, setFilterStatus] = useState('All'); // 'All', 'Active', 'Stopped'
   const fileInputRef = useRef(null);
   const sidebarRef = useRef(null);
 
@@ -201,14 +203,16 @@ const Wealth = () => {
   const downloadCSV = () => {
     if (!portfolio || portfolio.length === 0) return;
     
-    const headers = ['Scheme Code', 'Fund Name', 'Start Date', 'SIP Amount', 'Lumpsum', 'Total Invested', 'Current Value', 'Abs Return (%)', 'XIRR (%)'];
+    const headers = ['Scheme Code', 'Fund Name', 'Status', 'Start Date', 'End Date', 'SIP Amount', 'Lumpsum', 'Total Invested', 'Current Value', 'Abs Return (%)', 'XIRR (%)'];
     
     const rows = portfolio.map(item => {
       const stats = baseResults?.fundDetails?.find(f => f.id === item.id);
       return [
         item.fund.schemeCode,
         `"${item.fund.schemeName.replace(/"/g, '""')}"`,
+        item.inputs.endDate ? 'Stopped' : 'Active',
         item.inputs.startDate,
+        item.inputs.endDate || '',
         item.inputs.amount,
         item.inputs.lumpsum,
         stats?.totalInvested || 0,
@@ -254,6 +258,7 @@ const Wealth = () => {
         code: headers.findIndex(h => h.includes('code')),
         name: headers.findIndex(h => h.includes('name') || h.includes('fund')),
         date: headers.findIndex(h => h.includes('date') || h.includes('start')),
+        endDate: headers.findIndex(h => h.includes('end') && h.includes('date')),
         sip: headers.findIndex(h => h.includes('sip') || h.includes('amount')),
         lumpsum: headers.findIndex(h => h.includes('lumpsum'))
       };
@@ -268,6 +273,7 @@ const Wealth = () => {
         const schemeCode = colMap.code > -1 ? row[colMap.code] : null;
         const schemeName = colMap.name > -1 ? row[colMap.name] : null;
         const startDate = colMap.date > -1 ? row[colMap.date] : null;
+        const endDate = colMap.endDate > -1 ? row[colMap.endDate] : '';
         const sipAmount = colMap.sip > -1 ? parseFloat(row[colMap.sip]) || 0 : 0;
         const lumpsum = colMap.lumpsum > -1 ? parseFloat(row[colMap.lumpsum]) || 0 : 0;
 
@@ -287,7 +293,7 @@ const Wealth = () => {
             newItems.push({
               id: Date.now() + i,
               fund,
-              inputs: { startDate, amount: sipAmount, lumpsum, stepUpPercent: 0, stepUpValue: 0 },
+              inputs: { startDate, endDate, amount: sipAmount, lumpsum, stepUpPercent: 0, stepUpValue: 0 },
               navData
             });
           }
@@ -381,6 +387,13 @@ const Wealth = () => {
   // Sorting Logic
   const sortedPortfolio = useMemo(() => {
     let sortableItems = [...portfolio];
+
+    if (filterStatus === 'Active') {
+      sortableItems = sortableItems.filter(p => !p.inputs.endDate);
+    } else if (filterStatus === 'Stopped') {
+      sortableItems = sortableItems.filter(p => p.inputs.endDate);
+    }
+
     if (sortConfig.key !== null) {
       sortableItems.sort((a, b) => {
         const statsA = baseResults?.fundDetails?.find(f => f.id === a.id);
@@ -412,7 +425,7 @@ const Wealth = () => {
       });
     }
     return sortableItems;
-  }, [portfolio, sortConfig, baseResults]);
+  }, [portfolio, sortConfig, baseResults, filterStatus]);
 
   const requestSort = (key) => {
     let direction = 'asc';
@@ -584,6 +597,12 @@ const Wealth = () => {
                           ← Back to Full Portfolio
                         </button>
                       )}
+                      <div className={styles.filterContainer}>
+                        <span className={styles.filterLabel}>Filter:</span>
+                        <button onClick={() => setFilterStatus('All')} className={`${styles.filterBtn} ${filterStatus === 'All' ? styles.filterBtnActive : ''}`}>All</button>
+                        <button onClick={() => setFilterStatus('Active')} className={`${styles.filterBtn} ${filterStatus === 'Active' ? styles.filterBtnActive : ''}`}>Active</button>
+                        <button onClick={() => setFilterStatus('Stopped')} className={`${styles.filterBtn} ${filterStatus === 'Stopped' ? styles.filterBtnActive : ''}`}>Stopped</button>
+                      </div>
                       <div className={styles.trackerTableContainer}>
                         <table className={styles.trackerTable}>
                           <thead>
@@ -609,14 +628,16 @@ const Wealth = () => {
                               return (
                                 <tr key={item.id} 
                                     className={`${styles.trackerRow} ${viewingId === item.id ? styles.trackerRowSelected : ''}`}
-                                    onClick={() => setViewingId(item.id)}
+                                    onClick={() => setViewingId(viewingId === item.id ? null : item.id)}
                                 >
                                   <td>
                                     <span className={styles.fundName} title={item.fund.schemeName}>{item.fund.schemeName}</span>
                                     <span className={styles.fundMeta}>
+                                      {item.inputs.endDate && <span className={styles.stoppedIndicator} title="SIP Stopped">● </span>}
                                       {item.inputs.amount > 0 && `SIP: ₹${Number(item.inputs.amount).toLocaleString('en-IN')} | `}
                                       {item.inputs.lumpsum > 0 && `Lumpsum: ₹${Number(item.inputs.lumpsum).toLocaleString('en-IN')} | `}
                                       Start: {item.inputs.startDate}
+                                      {item.inputs.endDate && ` | End: ${item.inputs.endDate}`}
                                     </span>
                                   </td>
                                   <td data-label="Invested" style={{color: '#64748B'}}>
@@ -660,7 +681,7 @@ const Wealth = () => {
                           setSelectedFund(null); 
                           setNavData([]); 
                           setSearchQuery('');
-                          setTrackerInputs({ startDate: '2020-01-01', amount: 5000, lumpsum: 0, stepUpPercent: 0, stepUpValue: 0 });
+                          setTrackerInputs({ startDate: '2020-01-01', endDate: '', amount: 5000, lumpsum: 0, stepUpPercent: 0, stepUpValue: 0 });
                           setInvestmentMode('SIP');
                         }} className={styles.addFundBtn}>+ Add Fund</button>
                         <button onClick={downloadCSV} className={styles.exportBtn}>Export CSV</button>
@@ -723,6 +744,13 @@ const Wealth = () => {
                     <label className={styles.label}>Start Date</label>
                     <input type="date" value={trackerInputs.startDate} onChange={(e) => setTrackerInputs({...trackerInputs, startDate: e.target.value})} className={styles.dateInput} />
                   </div>
+
+                  {(investmentMode === 'SIP' || investmentMode === 'Both') && (
+                    <div className={styles.inputGroup}>
+                      <label className={styles.label}>SIP End Date (Optional)</label>
+                      <input type="date" value={trackerInputs.endDate || ''} onChange={(e) => setTrackerInputs({...trackerInputs, endDate: e.target.value})} className={styles.dateInput} placeholder="Leave blank if ongoing" />
+                    </div>
+                  )}
 
                   <div className={styles.inputGroup}>
                     <label className={styles.label}>Investment Type</label>
@@ -1013,27 +1041,51 @@ const Wealth = () => {
                     </>
                   ) : currentMenu === 'Tracker' && portfolio.length > 0 ? (
                     <>
-                      <thead>
-                        <tr>
-                          <th className={styles.th}>Date</th>
-                          <th className={styles.th}>NAV</th>
-                          <th className={styles.th}>Invested</th>
-                          <th className={styles.th}>Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {/* Show reversed for table (newest first) */}
-                        {[...chartData].reverse().map((row, index) => (
-                          <tr key={index}>
-                            <td className={styles.td}>{row.name}</td>
-                            <td className={styles.td}>{row.NAV}</td>
-                            <td className={styles.td}>₹{Number(row.Invested).toLocaleString('en-IN')}</td>
-                            <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
-                              ₹{Number(row.TotalValue).toLocaleString('en-IN')}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
+                      {viewingId ? (
+                        <>
+                          <thead>
+                            <tr>
+                              <th className={styles.th}>Date</th>
+                              <th className={styles.th}>NAV</th>
+                              <th className={styles.th}>Amount</th>
+                              <th className={styles.th}>Units</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...(results.purchaseHistory || [])].reverse().map((row, index) => (
+                              <tr key={index}>
+                                <td className={styles.td}>{row.dateStr}</td>
+                                <td className={styles.td}>{row.nav.toFixed(2)}</td>
+                                <td className={styles.td}>₹{Number(row.amount).toLocaleString('en-IN')}</td>
+                                <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
+                                  {row.units.toFixed(3)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </>
+                      ) : (
+                        <>
+                          <thead>
+                            <tr>
+                              <th className={styles.th}>Date</th>
+                              <th className={styles.th}>Total Invested</th>
+                              <th className={styles.th}>Total Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...(results.breakdown || [])].reverse().map((row, index) => (
+                              <tr key={index}>
+                                <td className={styles.td}>{row.name}</td>
+                                <td className={styles.td}>₹{Number(row.Invested).toLocaleString('en-IN')}</td>
+                                <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
+                                  ₹{Number(row.TotalValue).toLocaleString('en-IN')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
