@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useFinance } from '../hooks/useFinance';
 import WealthChart from './WealthChart';
 import DualInput from './DualInput';
@@ -7,7 +7,7 @@ import styles from './WealthPlanner.module.css';
 import CalculatorGuide from './CalculatorGuide';
 
 const Wealth = () => {
-  const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP } = useFinance();
+  const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculateRealSIP, calculatePortfolio, getFundList, getFundNAV } = useFinance();
   const [currentMenu, setCurrentMenu] = useState('SIP'); // 'SIP', 'RD', 'Loan'
   const [activeTab, setActiveTab] = useState('primary'); // For comparison views
   const [activeStrategy, setActiveStrategy] = useState('percent'); // For SIP Step-up
@@ -20,18 +20,305 @@ const Wealth = () => {
     loan: { principal: 1000000, rate: 8.5, months: 120, yearlyExtra: 0, monthlyExtra: 0 },
     swp: { initialCorpus: 10000000, monthlyWithdrawal: 50000, annualRate: 8, stepUpPercent: 0 }
   });
+
+  // --- Tracker State ---
+  const [portfolio, setPortfolio] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mf_portfolio');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [isAddingFund, setIsAddingFund] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [fundList, setFundList] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFund, setSelectedFund] = useState(null);
+  const [navData, setNavData] = useState([]);
+  const [trackerLoading, setTrackerLoading] = useState(false);
+  const [trackerInputs, setTrackerInputs] = useState({
+    startDate: '2020-01-01',
+    amount: 5000,
+    lumpsum: 0,
+    stepUpPercent: 0,
+    stepUpValue: 0
+  });
   
+  const [viewingId, setViewingId] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState(null);
+  const [deletedItem, setDeletedItem] = useState(null);
+  const [showToast, setShowToast] = useState(false);
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    setViewingId(null);
+  }, [currentMenu]);
+  
+  // Save Portfolio to LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('mf_portfolio', JSON.stringify(portfolio));
+    } catch (e) {
+      console.error("Failed to save portfolio", e);
+    }
+  }, [portfolio]);
+
+  // Fetch Fund List on Tracker Load
+  useEffect(() => {
+    if (currentMenu === 'Tracker' && fundList.length === 0) {
+      setTrackerLoading(true);
+      getFundList()
+        .then(data => {
+          if (data) setFundList(data);
+          setTrackerLoading(false);
+        });
+    }
+  }, [currentMenu, fundList.length]);
+
+  // Fetch NAV when fund selected
+  const handleFundSelect = async (fund) => {
+    setSelectedFund(fund);
+    setSearchQuery('');
+    setTrackerLoading(true);
+    setNavData([]); // Clear previous data to avoid mixing results
+    const data = await getFundNAV(fund.schemeCode);
+    if (data && data.length > 0) setNavData(data);
+    setTrackerLoading(false);
+  };
+
+  // Force Refresh Fund List
+  const handleRefreshFunds = () => {
+    setTrackerLoading(true);
+    getFundList(true)
+      .then(data => {
+        if (data) setFundList(data);
+        setTrackerLoading(false);
+      });
+  };
+
+  // Add Fund to Portfolio
+  const handleAddToPortfolio = () => {
+    if (!selectedFund || navData.length === 0) return;
+    
+    if (editingId) {
+      setPortfolio(portfolio.map(p => p.id === editingId ? {
+        ...p,
+        fund: selectedFund,
+        inputs: { ...trackerInputs },
+        navData: [...navData]
+      } : p));
+      setEditingId(null);
+    } else {
+      const newEntry = {
+        id: Date.now(),
+        fund: selectedFund,
+        inputs: { ...trackerInputs },
+        navData: [...navData] // Store copy of NAV data
+      };
+      setPortfolio([...portfolio, newEntry]);
+    }
+    
+    // Reset inputs
+    setSelectedFund(null);
+    setNavData([]);
+    setSearchQuery('');
+    setIsAddingFund(false);
+  };
+
+  // Edit Fund
+  const handleEditFund = (item) => {
+    setSelectedFund(item.fund);
+    setTrackerInputs(item.inputs);
+    setNavData(item.navData);
+    setEditingId(item.id);
+    setIsAddingFund(true);
+  };
+
+  // Remove Fund
+  const handleRemoveFund = (id) => {
+    setDeleteConfirmationId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmationId) {
+      const itemToDelete = portfolio.find(p => p.id === deleteConfirmationId);
+      setDeletedItem(itemToDelete);
+      setPortfolio(portfolio.filter(p => p.id !== deleteConfirmationId));
+      
+      if (viewingId === deleteConfirmationId) setViewingId(null);
+      setDeleteConfirmationId(null);
+      setShowToast(true);
+    }
+  };
+
+  const handleUndo = () => {
+    if (deletedItem) {
+      setPortfolio(prev => [...prev, deletedItem]);
+      setShowToast(false);
+      setDeletedItem(null);
+    }
+  };
+
+  useEffect(() => {
+    let timer;
+    if (showToast) {
+      timer = setTimeout(() => setShowToast(false), 4000);
+    }
+    return () => clearTimeout(timer);
+  }, [showToast, deletedItem]);
+
+  const handleClearPortfolio = () => {
+    setPortfolio([]);
+    setShowClearConfirmation(false);
+  };
+
+  // Export to CSV
+  const downloadCSV = () => {
+    if (!portfolio || portfolio.length === 0) return;
+    
+    const headers = ['Scheme Code', 'Fund Name', 'Start Date', 'SIP Amount', 'Lumpsum', 'Total Invested', 'Current Value', 'Abs Return (%)', 'XIRR (%)'];
+    
+    const rows = portfolio.map(item => {
+      const stats = baseResults?.fundDetails?.find(f => f.id === item.id);
+      return [
+        item.fund.schemeCode,
+        `"${item.fund.schemeName.replace(/"/g, '""')}"`,
+        item.inputs.startDate,
+        item.inputs.amount,
+        item.inputs.lumpsum,
+        stats?.totalInvested || 0,
+        stats?.currentValue || 0,
+        stats?.absoluteReturn || 0,
+        stats?.xirr || 0
+      ];
+    });
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `portfolio_tracker_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+  };
+
+  // Import CSV
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setTrackerLoading(true);
+    try {
+      // Ensure fund list is available for name lookups
+      let currentFundList = fundList;
+      if (currentFundList.length === 0) {
+        currentFundList = await getFundList();
+        setFundList(currentFundList || []);
+      }
+
+      const text = await file.text();
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+      if (lines.length < 2) throw new Error("Invalid CSV format");
+
+      // Detect columns (Case insensitive)
+      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+      const colMap = {
+        code: headers.findIndex(h => h.includes('code')),
+        name: headers.findIndex(h => h.includes('name') || h.includes('fund')),
+        date: headers.findIndex(h => h.includes('date') || h.includes('start')),
+        sip: headers.findIndex(h => h.includes('sip') || h.includes('amount')),
+        lumpsum: headers.findIndex(h => h.includes('lumpsum'))
+      };
+
+      const newItems = [];
+      
+      // Process rows (Skip header)
+      for (let i = 1; i < lines.length; i++) {
+        // Split by comma, handling quotes
+        const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(val => val.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+        
+        const schemeCode = colMap.code > -1 ? row[colMap.code] : null;
+        const schemeName = colMap.name > -1 ? row[colMap.name] : null;
+        const startDate = colMap.date > -1 ? row[colMap.date] : null;
+        const sipAmount = colMap.sip > -1 ? parseFloat(row[colMap.sip]) || 0 : 0;
+        const lumpsum = colMap.lumpsum > -1 ? parseFloat(row[colMap.lumpsum]) || 0 : 0;
+
+        if (!startDate) continue;
+
+        // Identify Fund
+        let fund = null;
+        if (schemeCode) fund = currentFundList?.find(f => String(f.schemeCode) === String(schemeCode));
+        if (!fund && schemeName) fund = currentFundList?.find(f => f.schemeName.toLowerCase() === schemeName.toLowerCase());
+        
+        // Fallback if code exists but not in list (fetch anyway)
+        if (!fund && schemeCode) fund = { schemeCode, schemeName: schemeName || `Fund ${schemeCode}` };
+
+        if (fund) {
+          const navData = await getFundNAV(fund.schemeCode);
+          if (navData && navData.length > 0) {
+            newItems.push({
+              id: Date.now() + i,
+              fund,
+              inputs: { startDate, amount: sipAmount, lumpsum, stepUpPercent: 0, stepUpValue: 0 },
+              navData
+            });
+          }
+        }
+      }
+
+      if (newItems.length > 0) {
+        setPortfolio(prev => [...prev, ...newItems]);
+        alert(`Successfully imported ${newItems.length} funds.`);
+      } else {
+        alert("No valid funds found. Please check CSV format (Requires 'Scheme Code' or 'Fund Name', and 'Start Date').");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to import CSV. Please check the file format.");
+    } finally {
+      setTrackerLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   // 1. Unified Calculation Engine
   // Inside Wealth.jsx
-  const results = useMemo(() => {
+  const baseResults = useMemo(() => {
     if (currentMenu === 'SIP') {
-      return calculateSIP(
+      const sipData = calculateSIP(
         inputs.sip.amount, inputs.sip.rate, inputs.sip.years,
         activeStrategy === 'percent' ? inputs.sip.stepUpPercent : 0,
         activeStrategy === 'fixed' ? inputs.sip.stepUpValue : 0,
         inputs.sip.initialLumpsum,
         inputs.sip.inflationRate
       );
+
+      // Recalculate inflation adjusted values to ensure accuracy
+      // Formula: Real Value = Nominal Value / (1 + inflationRate)^Years
+      if (sipData) {
+        const inflationDecimal = inputs.sip.inflationRate / 100;
+
+        if (sipData.summary) {
+          const discountFactor = Math.pow(1 + inflationDecimal, inputs.sip.years);
+          sipData.summary.normalSip.inflationAdjustedValue = sipData.summary.normalSip.totalValue / discountFactor;
+          sipData.summary.stepUpSip.inflationAdjustedValue = sipData.summary.stepUpSip.totalValue / discountFactor;
+        }
+
+        if (sipData.breakdown) {
+          sipData.breakdown.forEach(item => {
+            const discountFactor = Math.pow(1 + inflationDecimal, item.year);
+            if (item.normal) item.normal.adjustedTotalValue = item.normal.totalValue / discountFactor;
+            if (item.stepUp) item.stepUp.adjustedTotalValue = item.stepUp.totalValue / discountFactor;
+          });
+        }
+      }
+      return sipData;
     } else if (currentMenu === 'RD') {
       return calculateRD(inputs.rd.monthlyDeposit, inputs.rd.rate, inputs.rd.quarters);
     } else if (currentMenu === 'Lumpsum') {
@@ -46,9 +333,73 @@ const Wealth = () => {
         loanPrepaymentStrategy === 'yearly' ? inputs.loan.yearlyExtra : 0,
         loanPrepaymentStrategy === 'monthly' ? inputs.loan.monthlyExtra : 0
       );
+    } else if (currentMenu === 'Tracker') {
+      return calculatePortfolio(portfolio);
     }
     return null;
-  }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP]);
+  }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, portfolio, calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculatePortfolio]);
+
+  // When portfolio is cleared, also clear viewingId
+  useEffect(() => {
+    if (portfolio.length === 0) setViewingId(null);
+  }, [portfolio]);
+
+  // Filter results based on selection (for Tracker)
+  const results = useMemo(() => {
+    if (currentMenu === 'Tracker' && baseResults) {
+      if (viewingId && baseResults.fundDetails) {
+        const specific = baseResults.fundDetails.find(f => f.id === viewingId);
+        return specific || baseResults;
+      }
+      return baseResults;
+    }
+    return baseResults;
+  }, [baseResults, viewingId, currentMenu]);
+  
+  // Sorting Logic
+  const sortedPortfolio = useMemo(() => {
+    let sortableItems = [...portfolio];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        const statsA = baseResults?.fundDetails?.find(f => f.id === a.id);
+        const statsB = baseResults?.fundDetails?.find(f => f.id === b.id);
+        
+        let aValue, bValue;
+        
+        if (sortConfig.key === 'fund') {
+            aValue = a.fund.schemeName.toLowerCase();
+            bValue = b.fund.schemeName.toLowerCase();
+        } else if (sortConfig.key === 'invested') {
+            aValue = parseFloat(statsA?.totalInvested || 0);
+            bValue = parseFloat(statsB?.totalInvested || 0);
+        } else if (sortConfig.key === 'value') {
+            aValue = parseFloat(statsA?.currentValue || 0);
+            bValue = parseFloat(statsB?.currentValue || 0);
+        } else if (sortConfig.key === 'xirr') {
+            aValue = parseFloat(statsA?.xirr || 0);
+            bValue = parseFloat(statsB?.xirr || 0);
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [portfolio, sortConfig, baseResults]);
+
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   // 2. Chart Data Mapper
   const chartData = useMemo(() => {
     if (currentMenu === 'SIP') {
@@ -106,8 +457,15 @@ const Wealth = () => {
       data.unshift({ name: 'Start', 'Stepped-Up Withdrawal': inputs.swp.initialCorpus, 'Fixed Withdrawal': inputs.swp.initialCorpus });
       return data;
     }
+    if (currentMenu === 'Tracker' && results && results.breakdown) {
+      return results.breakdown;
+    }
     return [];
-  }, [results, currentMenu, activeTab, inputs.loan.principal, inputs.swp.initialCorpus]);
+  }, [results, currentMenu, activeTab, inputs.loan.principal, inputs.swp.initialCorpus, trackerInputs]);
+
+  // Determine if middle pane should be visible (Hidden when viewing Tracker list)
+  const showMiddlePane = currentMenu !== 'Tracker' || isAddingFund || portfolio.length === 0;
+  const showRightPane = currentMenu !== 'Tracker' || isAddingFund || portfolio.length === 0;
 
   return (
     <div className={styles.wealthPlannerRoot}>
@@ -116,7 +474,7 @@ const Wealth = () => {
         <aside className={styles.sidebar}>
           <h2 className={styles.sidebarTitle}>Calculators</h2>
           <div className={styles.sidebarMenu}>
-            {['SIP', 'Lumpsum', 'RD', 'Loan', 'SWP'].map(m => (
+            {['SIP', 'Lumpsum', 'RD', 'Loan', 'SWP', 'Tracker'].map(m => (
               <button key={m} onClick={() => setCurrentMenu(m)} className={`${styles.sidebarBtn} ${currentMenu === m ? styles.sidebarBtnActive : ''}`}>{m}</button>
             ))}
             <button onClick={() => setCurrentMenu('Help')} className={`${styles.sidebarBtn} ${currentMenu === 'Help' ? styles.sidebarBtnActive : ''}`}>Help</button>
@@ -128,7 +486,7 @@ const Wealth = () => {
             <CalculatorGuide />
           ) : (
           <>
-          <div className={styles.controlGrid}>
+          <div className={`${styles.controlGrid} ${!showMiddlePane ? (showRightPane ? styles.controlGridExpanded : styles.controlGridFull) : ''}`}>
             {/* Left: Input Section */}
             <div className={styles.innerCard}>
               <p className={styles.cardHeading}>{currentMenu} Details</p>
@@ -142,8 +500,8 @@ const Wealth = () => {
                     onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, rate: v } })} />
                   <DualInput label="Tenure" symbol="Yrs" value={inputs.sip.years} min={1} max={40} step={1}
                     onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, years: v } })} />
-                  <DualInput label="Assumed Inflation" symbol="%" value={inputs.sip.inflationRate} min={0} max={15} step={0.5}
-                    onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, inflationRate: v } })} />
+                  {/* <DualInput label="Assumed Inflation" symbol="%" value={inputs.sip.inflationRate} min={0} max={15} step={0.5}
+                    onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, inflationRate: v } })} /> */}
                 </>
               )}
               {/* Lumpsum Input View */}
@@ -187,9 +545,159 @@ const Wealth = () => {
                     onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, annualRate: v } })} />
                 </>
               )}
+              {currentMenu === 'Tracker' && (
+                <>
+                  {!isAddingFund && portfolio.length > 0 ? (
+                    <>
+                      {viewingId && (
+                        <button onClick={() => setViewingId(null)} className={styles.viewAllBtn}>
+                          ← Back to Full Portfolio
+                        </button>
+                      )}
+                      <div className={styles.trackerTableContainer}>
+                        <table className={styles.trackerTable}>
+                          <thead>
+                            <tr>
+                              <th onClick={() => requestSort('fund')} style={{cursor: 'pointer'}}>
+                                Fund {sortConfig.key === 'fund' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                              </th>
+                              <th onClick={() => requestSort('invested')} style={{cursor: 'pointer'}}>
+                                Invested {sortConfig.key === 'invested' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                              </th>
+                              <th onClick={() => requestSort('value')} style={{cursor: 'pointer'}}>
+                                Value {sortConfig.key === 'value' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                              </th>
+                              <th onClick={() => requestSort('xirr')} style={{cursor: 'pointer'}}>
+                                XIRR {sortConfig.key === 'xirr' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                              </th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortedPortfolio.map(item => {
+                              const stats = baseResults?.fundDetails?.find(f => f.id === item.id);
+                              return (
+                                <tr key={item.id} 
+                                    className={`${styles.trackerRow} ${viewingId === item.id ? styles.trackerRowSelected : ''}`}
+                                    onClick={() => setViewingId(item.id)}
+                                >
+                                  <td>
+                                    <span className={styles.fundName} title={item.fund.schemeName}>{item.fund.schemeName}</span>
+                                    <span className={styles.fundMeta}>{item.inputs.startDate}</span>
+                                  </td>
+                                  <td data-label="Invested" style={{color: '#64748B'}}>
+                                    ₹{Number(stats?.totalInvested || 0).toLocaleString('en-IN')}
+                                  </td>
+                                  <td data-label="Value">
+                                    <div style={{fontWeight: 'bold'}}>₹{Number(stats?.currentValue || 0).toLocaleString('en-IN')}</div>
+                                    <div style={{fontSize: '10px', color: (stats?.absoluteReturn || 0) >= 0 ? '#10B981' : '#EF4444'}}>{stats?.absoluteReturn}%</div>
+                                  </td>
+                                  <td data-label="XIRR" style={{fontWeight: '600', color: (stats?.xirr || 0) >= 0 ? '#10B981' : '#EF4444'}}>{stats?.xirr}%</td>
+                                  <td onClick={(e) => e.stopPropagation()}>
+                                    <button onClick={() => handleEditFund(item)} className={styles.iconBtn} title="Edit">✎</button>
+                                    <button onClick={() => handleRemoveFund(item.id)} className={styles.iconBtn} style={{color: '#EF4444'}} title="Remove">×</button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className={styles.trackerFooter}>
+                              <td>Total</td>
+                              <td data-label="Total Invested">₹{Number(baseResults?.totalInvested || 0).toLocaleString('en-IN')}</td>
+                              <td data-label="Total Value">
+                                <div>₹{Number(baseResults?.currentValue || 0).toLocaleString('en-IN')}</div>
+                                <div style={{fontSize: '10px', color: (baseResults?.absoluteReturn || 0) >= 0 ? '#10B981' : '#EF4444'}}>
+                                  {baseResults?.absoluteReturn}%
+                                </div>
+                              </td>
+                              <td data-label="Total XIRR" style={{color: (baseResults?.xirr || 0) >= 0 ? '#10B981' : '#EF4444'}}>
+                                {baseResults?.xirr}%
+                              </td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                      <div className={styles.trackerActionRow}>
+                        <button onClick={() => { setIsAddingFund(true); setEditingId(null); setSelectedFund(null); setNavData([]); setSearchQuery(''); }} className={styles.addFundBtn}>+ Add Fund</button>
+                        <button onClick={downloadCSV} className={styles.exportBtn}>Export CSV</button>
+                        <button onClick={handleImportClick} className={styles.importBtn}>Import CSV</button>
+                        <button onClick={() => setShowClearConfirmation(true)} className={styles.clearBtn}>Clear Portfolio</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                    {!selectedFund ? (
+                    <>
+                    <div className={styles.searchContainer}>
+                      <div className={styles.searchHeader}>
+                        <label className={styles.label}>Search Mutual Fund</label>
+                        <button onClick={handleRefreshFunds} className={styles.refreshBtn} title="Force Refresh List">↻</button>
+                      </div>
+                      <input 
+                        type="text" 
+                        list="fund-suggestions"
+                        placeholder="Start typing fund name..." 
+                        value={searchQuery}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSearchQuery(val);
+                          const match = fundList.find(f => f.schemeName === val);
+                          if (match) handleFundSelect(match);
+                        }}
+                        className={styles.searchInput}
+                      />
+                      <datalist id="fund-suggestions">
+                        {searchQuery.length > 1 && fundList
+                          .filter(f => f.schemeName.toLowerCase().includes(searchQuery.toLowerCase()))
+                          .slice(0, 50)
+                          .map(f => (
+                            <option key={f.schemeCode} value={f.schemeName} />
+                          ))
+                        }
+                      </datalist>
+                      {trackerLoading && <p className={styles.loadingText}>Loading funds...</p>}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', margin: '10px 0 20px 0' }}>
+                      <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
+                      <span style={{ padding: '0 10px', color: '#94A3B8', fontSize: '12px', fontWeight: '600' }}>OR</span>
+                      <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
+                    </div>
+                    <button onClick={handleImportClick} className={styles.importBtn} style={{ width: '100%', marginBottom: '20px' }}>
+                      Import Portfolio from CSV
+                    </button>
+                    </>
+                  ) : (
+                    <div className={styles.selectedFundBox}>
+                      <strong>{selectedFund.schemeName}</strong>
+                      <button onClick={() => { setSelectedFund(null); setNavData([]); }} className={styles.changeBtn}>Change</button>
+                      {trackerLoading && <div className={styles.fetchingText}>Fetching historical NAV data...</div>}
+                    </div>
+                  )}
+                  
+                  <div className={styles.inputGroup}>
+                    <label className={styles.label}>Start Date</label>
+                    <input type="date" value={trackerInputs.startDate} onChange={(e) => setTrackerInputs({...trackerInputs, startDate: e.target.value})} className={styles.dateInput} />
+                  </div>
+                  <DualInput label="Monthly SIP" symbol="₹" value={trackerInputs.amount} min={0} max={100000} step={500}
+                    onChange={(v) => setTrackerInputs({ ...trackerInputs, amount: v })} />
+                  <DualInput label="Initial Lumpsum" symbol="₹" value={trackerInputs.lumpsum} min={0} max={1000000} step={5000}
+                    onChange={(v) => setTrackerInputs({ ...trackerInputs, lumpsum: v })} />
+
+                  <button onClick={handleAddToPortfolio} disabled={!selectedFund || trackerLoading} className={styles.addFundBtn} style={{ marginTop: '20px' }}>
+                    {trackerLoading ? 'Loading...' : (editingId ? 'Update Portfolio' : 'Add to Portfolio')}
+                  </button>
+                  {portfolio.length > 0 && <button onClick={() => { setIsAddingFund(false); setEditingId(null); setSelectedFund(null); setNavData([]); setSearchQuery(''); }} className={styles.cancelBtn}>Cancel</button>}
+                  </>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Middle: Strategy/Extra Options */}
+            {showMiddlePane && (
             <div className={styles.innerCard}>
               {currentMenu === 'Loan' ? (
                 <>
@@ -210,7 +718,7 @@ const Wealth = () => {
                     <DualInput label="Extra Monthly Payment" symbol="₹" value={inputs.loan.monthlyExtra} min={0} max={10000} step={500}
                       onChange={(v) => setInputs({ ...inputs, loan: { ...inputs.loan, monthlyExtra: v } })} />
                   )}
-                  <p style={{ fontSize: '12px', color: '#64748B', marginTop: '10px' }}>
+                  <p className={styles.helperText}>
                     {loanPrepaymentStrategy === 'yearly'
                       ? 'This amount is paid once every year towards the principal.'
                       : 'This extra amount is paid every month with your EMI.'}
@@ -239,27 +747,42 @@ const Wealth = () => {
                     min={0} max={10} step={0.5}
                     onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, stepUpPercent: v } })}
                   />
-                  <p style={{ fontSize: '12px', color: '#64748B', marginTop: '10px' }}>
+                  <p className={styles.helperText}>
                     Increase withdrawal amount annually to counter inflation.
                   </p>
                 </>
-              ) : (
+              ) : currentMenu === 'Tracker' && (isAddingFund || portfolio.length === 0) ? (
+                <>
+                  <p className={styles.cardHeading}>Step-Up Strategy</p>
+                  <div className={styles.toggleWrapper}>
+                    <button onClick={() => setActiveStrategy('percent')} className={`${styles.toggleBtn} ${activeStrategy === 'percent' ? styles.toggleBtnActive : ''}`}>%</button>
+                    <button onClick={() => setActiveStrategy('fixed')} className={`${styles.toggleBtn} ${activeStrategy === 'fixed' ? styles.toggleBtnActive : ''}`}>₹</button>
+                  </div>
+                  {activeStrategy === 'percent' ? (
+                    <DualInput label="Yearly Step-up" symbol="%" value={trackerInputs.stepUpPercent} min={0} max={50} onChange={(v) => setTrackerInputs({ ...trackerInputs, stepUpPercent: v, stepUpValue: 0 })} />
+                  ) : (
+                    <DualInput label="Fixed Increase" symbol="₹" value={trackerInputs.stepUpValue} min={0} max={50000} onChange={(v) => setTrackerInputs({ ...trackerInputs, stepUpValue: v, stepUpPercent: 0 })} />
+                  )}
+                </>
+              ) : currentMenu !== 'Tracker' && (
                 <p className={styles.noStrategyText}>No additional strategy available for this mode.</p>
               )}
             </div>
+            )}
 
             {/* Right: Maturity Results */}
+            {showRightPane && (
             <div className={styles.resultsColumn}>
               {currentMenu === 'SIP' && (
                 <>
                   <ResultCard active={activeTab === 'primary'} label="STEP-UP MATURITY" color="#10B981" value={results.summary.stepUpSip.totalValue} onClick={() => setActiveTab('primary')} />
                   <ResultCard active={activeTab === 'secondary'} label="NORMAL MATURITY" color="#3B82F6" value={results.summary.normalSip.totalValue} onClick={() => setActiveTab('secondary')} />
-                  <ResultCard
+                  {/* <ResultCard
                     active={false}
                     label="MATURITY IN TODAY'S VALUE"
                     color="#F59E0B"
                     value={activeTab === 'primary' ? results.summary.stepUpSip.inflationAdjustedValue : results.summary.normalSip.inflationAdjustedValue}
-                  />
+                  /> */}
                 </>
               )}
               {/* Lumpsum Result Cards */}
@@ -303,17 +826,28 @@ const Wealth = () => {
                   <ResultCard active={false} label="Final Balance" color="#64748B" value={results.finalBalance} />
                 </>
               )}
+              {currentMenu === 'Tracker' && results && portfolio.length > 0 && (
+                <>
+                  <ResultCard active label={viewingId ? "CURRENT VALUE (SELECTED)" : "TOTAL CURRENT VALUE"} color="#10B981" value={results.currentValue} />
+                  <ResultCard active={false} label="TOTAL INVESTED" color="#64748B" value={results.totalInvested} />
+                  <ResultCard active={false} label="ABS RETURNS" color={results.absoluteReturn >= 0 ? "#10B981" : "#EF4444"} value={`${results.absoluteReturn}%`} />
+                  <ResultCard active={false} label="XIRR" color={results.xirr >= 0 ? "#10B981" : "#EF4444"} value={`${results.xirr}%`} />
+                </>
+              )}
             </div>
+            )}
           </div>
 
           {/* Chart View */}
-          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
+          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
             <div className={`${styles.innerCard} ${styles.chartContainer}`}>
               <p className={styles.cardHeading}>
                 {currentMenu === 'SWP'
                   ? 'Corpus Depletion Over Time'
                   : currentMenu === 'Loan'
                   ? 'Loan Balance Over Time'
+                  : currentMenu === 'Tracker'
+                  ? 'Portfolio Growth (Actual)'
                   : currentMenu === 'SIP'
                     ? (activeTab === 'primary' ? 'Step-Up' : 'Normal') + ' Wealth Projection'
                     : 'RD Wealth Projection'
@@ -341,11 +875,21 @@ const Wealth = () => {
                   secondaryColor="#64748B"
                   hideInvestedLine={true}
                 />
+              ) : currentMenu === 'Tracker' ? (
+                <WealthChart
+                  data={chartData}
+                  primaryDataKey={viewingId ? "TotalValue" : "TotalValue"}
+                  primaryName="Current Value"
+                  primaryColor="#10B981"
+                  secondaryDataKey="Invested"
+                  secondaryName="Invested Amount"
+                  secondaryColor="#64748B"
+                />
               ) : (
                 <WealthChart
                   data={chartData}
                   primaryColor={currentMenu === 'RD' ? "#10B981" : (activeTab === 'primary' ? "#10B981" : "#3B82F6")}
-                  secondaryDataKey={inputs.sip.inflationRate > 0 ? "Adjusted Value" : undefined}
+                  secondaryDataKey={undefined}
                   secondaryName="Today's Value"
                   secondaryColor="#F59E0B"
                 />
@@ -354,13 +898,15 @@ const Wealth = () => {
           )}
 
           {/* Dynamic Breakdown Table */}
-          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
+          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
             <div className={styles.innerCard}>
               <p className={styles.cardHeading}>
                 {currentMenu === 'SWP'
                   ? 'Corpus Depletion Schedule'
                   : currentMenu === 'Loan'
                   ? 'Loan Repayment Schedule'
+                  : currentMenu === 'Tracker'
+                  ? 'Transaction History'
                   : `${currentMenu} ${currentMenu === 'SIP' && (activeTab === 'primary' ? 'Step-Up' : 'Normal')} Breakdown Schedule`
                 }
               </p>
@@ -380,7 +926,7 @@ const Wealth = () => {
                           <tr key={index}>
                             <td className={styles.td}>{row.name.replace(/Year |Yr /g, '')}</td>
                             {inputs.swp.stepUpPercent > 0 && <td className={styles.td}>₹{Number(row['Fixed Withdrawal']).toLocaleString('en-IN')}</td>}
-                            <td className={`${styles.td} ${styles.tdMaturity}`} style={{ color: '#EF4444' }}>
+                            <td className={`${styles.td} ${styles.tdMaturity} ${styles.textRed}`}>
                               ₹{Number(row['Stepped-Up Withdrawal'] ?? row['Fixed Withdrawal']).toLocaleString('en-IN')}
                             </td>
                           </tr>
@@ -401,8 +947,32 @@ const Wealth = () => {
                           <tr key={index}>
                             <td className={styles.td}>{row.name.replace('Yr ', '')}</td>
                             <td className={styles.td}>₹{Number(row['Without Prepayment']).toLocaleString('en-IN')}</td>
-                            <td className={`${styles.td} ${styles.tdMaturity}`} style={{ color: '#10B981' }}>
+                            <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
                               ₹{Number(row['With Prepayment']).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  ) : currentMenu === 'Tracker' && portfolio.length > 0 ? (
+                    <>
+                      <thead>
+                        <tr>
+                          <th className={styles.th}>Date</th>
+                          <th className={styles.th}>NAV</th>
+                          <th className={styles.th}>Invested</th>
+                          <th className={styles.th}>Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Show reversed for table (newest first) */}
+                        {[...chartData].reverse().map((row, index) => (
+                          <tr key={index}>
+                            <td className={styles.td}>{row.name}</td>
+                            <td className={styles.td}>{row.NAV}</td>
+                            <td className={styles.td}>₹{Number(row.Invested).toLocaleString('en-IN')}</td>
+                            <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
+                              ₹{Number(row.TotalValue).toLocaleString('en-IN')}
                             </td>
                           </tr>
                         ))}
@@ -416,7 +986,7 @@ const Wealth = () => {
                           <th className={styles.th}>{currentMenu === 'SIP' ? 'Monthly SIP' : 'Monthly Deposit'}</th>
                           <th className={styles.th}>Cumulative Investment</th>
                           <th className={styles.th}>Maturity Value</th>
-                          {currentMenu === 'SIP' && inputs.sip.inflationRate > 0 && <th className={styles.th}>Value in Today's Terms</th>}
+                          {/* {currentMenu === 'SIP' && inputs.sip.inflationRate > 0 && <th className={styles.th}>Value in Today's Terms</th>} */}
                         </tr>
                       </thead>
                       <tbody>
@@ -429,14 +999,14 @@ const Wealth = () => {
                                 <td className={styles.td}>{row.year}</td>
                                 <td className={styles.td}>₹{Number(activeTab === 'primary' ? data.monthlyInstallment : inputs.sip.amount).toLocaleString('en-IN')}</td>
                                 <td className={styles.td}>₹{Number(data.investedAmount).toLocaleString('en-IN')}</td>
-                                <td className={`${styles.td} ${styles.tdMaturity}`} style={{ color: activeTab === 'primary' ? '#10B981' : '#3B82F6' }}>
+                                <td className={`${styles.td} ${styles.tdMaturity} ${activeTab === 'primary' ? styles.textGreen : styles.textBlue}`}>
                                   ₹{Number(data.totalValue).toLocaleString('en-IN')}
                                 </td>
-                                {inputs.sip.inflationRate > 0 && (
+                                {/* {inputs.sip.inflationRate > 0 && (
                                   <td className={`${styles.td} ${styles.tdMaturity}`} style={{ color: '#F59E0B' }}>
                                     ₹{Number(data.adjustedTotalValue).toLocaleString('en-IN')}
                                   </td>
-                                )}
+                                )} */}
                               </tr>
                             );
                           })
@@ -447,7 +1017,7 @@ const Wealth = () => {
                               <td className={styles.td}>{row.name}</td>
                               <td className={styles.td}>₹{Number(inputs.rd.monthlyDeposit).toLocaleString('en-IN')}</td>
                               <td className={styles.td}>₹{Number(row.Invested).toLocaleString('en-IN')}</td>
-                              <td className={`${styles.td} ${styles.tdMaturity}`} style={{ color: '#10B981' }}>
+                              <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
                                 ₹{Number(row.TotalValue).toLocaleString('en-IN')}
                               </td>
                             </tr>
@@ -463,6 +1033,51 @@ const Wealth = () => {
           </>
           )}
         </div>
+
+        {/* Confirmation Modal */}
+        {deleteConfirmationId && (
+          <div className={styles.modalOverlay}>
+            <div className={styles.modalContent}>
+              <h3 className={styles.modalTitle}>Remove Fund?</h3>
+              <p className={styles.modalText}>Are you sure you want to remove this fund from your portfolio? This action cannot be undone.</p>
+              <div className={styles.modalActions}>
+                <button onClick={() => setDeleteConfirmationId(null)} className={`${styles.modalBtn} ${styles.modalCancelBtn}`}>Cancel</button>
+                <button onClick={confirmDelete} className={`${styles.modalBtn} ${styles.modalDeleteBtn}`}>Remove</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Clear All Confirmation Modal */}
+        {showClearConfirmation && (
+          <div className={styles.modalOverlay}>
+            <div className={styles.modalContent}>
+              <h3 className={styles.modalTitle}>Clear Entire Portfolio?</h3>
+              <p className={styles.modalText}>Are you sure you want to remove ALL funds from your portfolio? This action is permanent and cannot be undone.</p>
+              <div className={styles.modalActions}>
+                <button onClick={() => setShowClearConfirmation(false)} className={`${styles.modalBtn} ${styles.modalCancelBtn}`}>Cancel</button>
+                <button onClick={handleClearPortfolio} className={`${styles.modalBtn} ${styles.modalDeleteBtn}`}>Clear All</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Undo Toast */}
+        {showToast && (
+          <div className={styles.toast}>
+            <span>Fund removed</span>
+            <button onClick={handleUndo} className={styles.undoBtn}>Undo</button>
+            <button onClick={() => setShowToast(false)} className={styles.closeToastBtn}>✕</button>
+          </div>
+        )}
+
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          style={{display: 'none'}} 
+          accept=".csv" 
+          onChange={handleFileChange} 
+        />
       </div>
     </div>
   );

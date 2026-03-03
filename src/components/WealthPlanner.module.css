@@ -61,6 +61,7 @@
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
   overflow-y: auto;
   padding: 20px;
+  box-sizing: border-box;
 }
 
 .controlGrid {
@@ -75,6 +76,7 @@
   border-radius: 16px;
   border: 1px solid #F1F5F9;
   background-color: #FFFFFF;
+  box-sizing: border-box;
 }
 
 .cardHeading {
@@ -228,14 +230,18 @@
   }
 
   .mainPanel {
-    padding: 16px;
+    padding: 10px;
     height: auto;
     flex: 1;
   }
 
   .controlGrid {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: 12px;
+  }
+
+  .innerCard {
+    padding: 16px;
   }
 }
 
@@ -299,4 +305,633 @@
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.9em;
+}
+
+.searchContainer {
+  margin-bottom: 15px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  margin-top: 5px;
+  box-sizing: border-box;
+}
+
+.loadingText {
+  font-size: 12px;
+  color: #666;
+}
+
+.selectedFundBox {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #e0f2fe;
+  color: #0c4a6e;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.changeBtn {
+  float: right;
+  border: none;
+  background: none;
+  color: red;
+  cursor: pointer;
+}
+
+.fetchingText {
+  margin-top: 5px;
+  color: #666;
+  font-size: 11px;
+}
+
+.inputGroup {
+  margin-bottom: 15px;
+}
+
+.label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748B;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.dateInput {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.helperText {
+  font-size: 12px;
+  color: #64748B;
+  margin-top: 10px;
+}
+
+.textRed {
+  color: #EF4444;
+}
+
+.textGreen {
+  color: #10B981;
+}
+
+.textBlue {
+  color: #3B82F6;
+}
+
+.searchHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.refreshBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #3B82F6;
+  padding: 0;
+  line-height: 1;
+}
+
+.refreshBtn:hover {
+  color: #1d4ed8;
+}
+
+.portfolioList {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.portfolioItem {
+  padding: 15px;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  background-color: #FFFFFF;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.portfolioItemInfo {
+  flex: 1;
+}
+
+.portfolioItemTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0 0 5px 0;
+}
+
+.portfolioItemSubtitle {
+  font-size: 12px;
+  color: #64748B;
+  margin: 0;
+}
+
+.portfolioActions {
+  display: flex;
+  gap: 8px;
+}
+
+.actionBtn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.editBtn {
+  color: #3B82F6;
+  border-color: #BFDBFE;
+}
+
+.editBtn:hover {
+  background-color: #EFF6FF;
+  color: #2563EB;
+}
+
+.deleteBtn {
+  color: #EF4444;
+  border-color: #FECACA;
+}
+
+.deleteBtn:hover {
+  background-color: #FEF2F2;
+  color: #DC2626;
+}
+
+.addFundBtn {
+  width: 100%;
+  padding: 12px;
+  background-color: #3B82F6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.addFundBtn:hover {
+  background-color: #2563EB;
+}
+
+.addFundBtn:disabled {
+  background-color: #94A3B8;
+  cursor: not-allowed;
+}
+
+.cancelBtn {
+  width: 100%;
+  padding: 12px;
+  background-color: transparent;
+  color: #64748B;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+/* Tracker Specific Styles */
+.trackerTableContainer {
+  overflow: auto;
+  max-height: 60vh;
+  margin-bottom: 15px;
+}
+
+.trackerTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.trackerTable th {
+  text-align: center;
+  color: #64748B;
+  padding: 8px 4px;
+  border-bottom: none;
+  box-shadow: 0 1px 0 #E2E8F0;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  background-color: #FFFFFF;
+  z-index: 5;
+}
+
+.trackerTable td {
+  padding: 8px 4px;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
+  color: #334155;
+  text-align: center;
+}
+
+.trackerRow {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.trackerRow:hover {
+  background-color: #F1F5F9;
+}
+
+.trackerRow:nth-child(even) {
+  background-color: #F8FAFC;
+}
+
+.trackerRow.trackerRowSelected {
+  background-color: #EFF6FF;
+  border-left: 3px solid #3B82F6;
+}
+
+.viewAllBtn {
+  width: 100%;
+  margin-bottom: 15px;
+  padding: 8px;
+  background-color: #E2E8F0;
+  color: #475569;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.viewAllBtn:hover {
+  background-color: #CBD5E1;
+}
+
+.fundName {
+  font-weight: 600;
+  color: #1E293B;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fundMeta {
+  color: #94A3B8;
+  font-size: 10px;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #94A3B8;
+  padding: 4px;
+  line-height: 1;
+}
+
+.iconBtn:hover {
+  color: #3B82F6;
+}
+
+.controlGridExpanded {
+  grid-template-columns: 2.2fr 1.2fr;
+}
+
+.controlGridFull {
+  grid-template-columns: 1fr;
+}
+
+.trackerFooter {
+  background-color: #F8FAFC;
+  border-top: 2px solid #E2E8F0;
+  font-weight: 700;
+}
+
+.trackerFooter td {
+  padding: 12px 4px;
+  color: #1E293B;
+  border-bottom: none;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .controlGridExpanded {
+    grid-template-columns: 1fr;
+  }
+
+  /* Responsive Tracker Table - Card View */
+  .trackerTableContainer {
+    max-height: none;
+    overflow-x: visible;
+  }
+
+  .trackerTable thead {
+    display: none;
+  }
+
+  .trackerTable, .trackerTable tbody, .trackerTable tfoot {
+    display: block;
+  }
+
+  .trackerTable tr {
+    display: block;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 10px;
+    padding: 10px;
+    position: relative;
+    box-sizing: border-box;
+  }
+
+  .trackerTable td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #F1F5F9;
+    text-align: right;
+    font-size: 14px;
+    box-sizing: border-box;
+  }
+
+  .trackerTable td:before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #64748B;
+    text-align: left;
+    padding-right: 10px;
+  }
+
+  .trackerTable td:first-child {
+    display: block;
+    padding: 0 0 10px 0;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #E2E8F0;
+  }
+  .trackerTable td:first-child::before { display: none; }
+  .trackerTable td:nth-last-child(2) { border-bottom: none; }
+  .trackerTable td:last-child {
+    display: flex;
+    position: static;
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 0 0 0;
+    border-top: 1px solid #F1F5F9;
+    margin-top: 5px;
+    border-bottom: none;
+  }
+  .trackerTable td:last-child::before { display: none; }
+
+  .trackerTable td:last-child .iconBtn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid #E2E8F0;
+    background-color: #F8FAFC;
+  }
+
+  .trackerTable td:last-child .iconBtn[title="Edit"] {
+    color: #3B82F6;
+    background-color: #EFF6FF;
+    border-color: #BFDBFE;
+  }
+  .trackerTable td:last-child .iconBtn[title="Edit"]::after {
+    content: "Edit";
+  }
+
+  .trackerTable td:last-child .iconBtn[title="Remove"] {
+    color: #EF4444 !important;
+    background-color: #FEF2F2;
+    border-color: #FECACA;
+  }
+  .trackerTable td:last-child .iconBtn[title="Remove"]::after {
+    content: "Remove";
+  }
+
+  .fundName {
+    max-width: 100%;
+    white-space: normal;
+    font-size: 15px;
+  }
+
+  .trackerFooter {
+    border: 2px solid #3B82F6;
+    background-color: #F8FAFC;
+  }
+  .trackerFooter td:first-child {
+    font-size: 16px;
+    font-weight: 700;
+    border-bottom: 1px solid #E2E8F0;
+    margin-bottom: 10px;
+  }
+}
+
+/* Modal Styles */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background-color: white;
+  padding: 24px;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.modalTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0 0 8px 0;
+}
+
+.modalText {
+  color: #64748B;
+  margin: 0 0 24px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.modalBtn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-size: 14px;
+  flex: 1;
+}
+
+.modalCancelBtn {
+  background-color: #F1F5F9;
+  color: #64748B;
+}
+
+.modalCancelBtn:hover {
+  background-color: #E2E8F0;
+}
+
+.modalDeleteBtn {
+  background-color: #EF4444;
+  color: white;
+}
+
+.modalDeleteBtn:hover {
+  background-color: #DC2626;
+}
+
+/* Toast Notification */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #1E293B;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 2000;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 14px;
+}
+
+.undoBtn {
+  background: none;
+  border: none;
+  color: #3B82F6;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+}
+
+.closeToastBtn {
+  background: none;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+}
+
+@keyframes slideUp {
+  from { transform: translate(-50%, 100%); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+/* Tracker Actions */
+.trackerActionRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.trackerActionRow > button {
+  flex: 1;
+  width: auto; /* Override default 100% width of addFundBtn */
+}
+
+.exportBtn {
+  padding: 12px;
+  background-color: #FFFFFF;
+  color: #3B82F6;
+  border: 1px solid #3B82F6;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+
+.exportBtn:hover {
+  background-color: #EFF6FF;
+}
+
+@media (max-width: 768px) {
+  .trackerActionRow {
+    flex-direction: column;
+  }
+  .trackerActionRow > button {
+    width: 100%;
+  }
+}
+
+.importBtn {
+  padding: 12px;
+  background-color: #FFFFFF;
+  color: #64748B;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+
+.importBtn:hover {
+  background-color: #F1F5F9;
+  color: #334155;
+}
+
+.clearBtn {
+  padding: 12px;
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.clearBtn:hover {
+  background-color: #FEE2E2;
+  color: #B91C1C;
 }

@@ -290,5 +290,252 @@ export const useFinance = () => {
       breakdown: chartBreakdown // Added for the chart
     };
   }
-  return { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP };
+
+  // Helper: Calculate XIRR using Newton-Raphson method
+  const calculateXIRR = (transactions) => {
+    if (!transactions || transactions.length < 2) return 0;
+
+    let x0 = 0.1; // Initial guess: 10%
+    const tol = 1e-5;
+    const maxIter = 50;
+
+    const t0 = transactions[0].date;
+    // Pre-calculate days for performance
+    const data = transactions.map(t => ({
+      v: t.amount,
+      d: (t.date - t0) / (1000 * 60 * 60 * 24)
+    }));
+
+    for (let i = 0; i < maxIter; i++) {
+      let f = 0; // f(x)
+      let df = 0; // f'(x)
+
+      for (let j = 0; j < data.length; j++) {
+        const { v, d } = data[j];
+        const base = 1 + x0;
+        if (base <= 0) { x0 = 0.01; break; } // Prevent invalid base
+        const exp = d / 365;
+        const factor = Math.pow(base, exp);
+
+        f += v / factor;
+        df -= (v * exp) / (factor * base);
+      }
+
+      if (Math.abs(f) < tol) return x0 * 100;
+      if (df === 0) break;
+      const newX = x0 - f / df;
+      if (isNaN(newX) || Math.abs(newX - x0) < tol) return newX * 100;
+      x0 = newX;
+    }
+    return x0 * 100;
+  };
+
+  const calculateRealSIP = (navData, inputs) => {
+    if (!navData || navData.length === 0) return null;
+
+    const { startDate, amount, lumpsum, stepUpPercent, stepUpValue } = inputs;
+    const start = new Date(startDate);
+    
+    // Parse and sort NAV data (API returns newest first, we need oldest first)
+    const sortedNav = navData.map(d => {
+        const parts = d.date.split('-'); // Expecting dd-mm-yyyy
+        if (parts.length === 3) {
+            return {
+                date: new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])), // yyyy, mm-1, dd
+                dateStr: d.date,
+                nav: new Decimal(d.nav)
+            };
+        }
+        return null;
+    }).filter(item => item !== null).sort((a, b) => a.date - b.date);
+
+    // Find the first NAV date >= startDate
+    const startIndex = sortedNav.findIndex(d => d.date >= start);
+    if (startIndex === -1) return null;
+
+    let currentUnits = new Decimal(0);
+    let totalInvested = new Decimal(0);
+    let currentSIPAmount = new Decimal(amount || 0);
+    let nextSIPDate = new Date(start); 
+    const xirrTransactions = [];
+    
+    // Handle Initial Lumpsum
+    if (lumpsum > 0) {
+        const firstNav = sortedNav[startIndex].nav;
+        const ls = new Decimal(lumpsum);
+        currentUnits = currentUnits.plus(ls.div(firstNav));
+        totalInvested = totalInvested.plus(ls);
+        xirrTransactions.push({ amount: -ls.toNumber(), date: sortedNav[startIndex].date });
+    }
+
+    const breakdown = [];
+    let sipCount = 0;
+
+    // Iterate through available NAV days
+    for (let i = startIndex; i < sortedNav.length; i++) {
+        const day = sortedNav[i];
+        
+        // Check if a SIP is due (catch up if multiple dates passed)
+        if (amount > 0) {
+            while (day.date >= nextSIPDate) {
+                const units = currentSIPAmount.div(day.nav);
+                currentUnits = currentUnits.plus(units);
+                totalInvested = totalInvested.plus(currentSIPAmount);
+                xirrTransactions.push({ amount: -currentSIPAmount.toNumber(), date: day.date });
+                sipCount++;
+
+                // Step Up Logic (Annually)
+                if (sipCount > 0 && sipCount % 12 === 0) {
+                    if (stepUpPercent > 0) {
+                        currentSIPAmount = currentSIPAmount.times(new Decimal(1).plus(new Decimal(stepUpPercent).div(100)));
+                    } else if (stepUpValue > 0) {
+                        currentSIPAmount = currentSIPAmount.plus(new Decimal(stepUpValue));
+                    }
+                }
+                // Next SIP date (+1 month)
+                nextSIPDate = new Date(nextSIPDate.getFullYear(), nextSIPDate.getMonth() + 1, nextSIPDate.getDate());
+            }
+        }
+
+        // Sample data points for chart (Month End or Last Day)
+        const isLastDay = i === sortedNav.length - 1;
+        const isMonthEnd = i < sortedNav.length - 1 && sortedNav[i+1].date.getMonth() !== day.date.getMonth();
+        
+        if (isLastDay || isMonthEnd) {
+            breakdown.push({
+                name: day.dateStr,
+                date: day.date,
+                Invested: totalInvested.toNumber(),
+                TotalValue: currentUnits.times(day.nav).toNumber(),
+                NAV: day.nav.toNumber()
+            });
+        }
+    }
+
+    const lastNav = sortedNav[sortedNav.length - 1].nav;
+    const currentValue = currentUnits.times(lastNav);
+    const absoluteReturn = totalInvested.gt(0) 
+        ? currentValue.minus(totalInvested).div(totalInvested).times(100) 
+        : new Decimal(0);
+
+    // Add final value as positive cash flow for XIRR
+    xirrTransactions.push({ amount: currentValue.toNumber(), date: sortedNav[sortedNav.length - 1].date });
+    const xirrValue = calculateXIRR(xirrTransactions);
+
+    return {
+        currentValue: currentValue.toFixed(2),
+        totalInvested: totalInvested.toFixed(2),
+        absoluteReturn: absoluteReturn.toFixed(2),
+        xirr: xirrValue.toFixed(2),
+        xirrTransactions,
+        totalUnits: currentUnits.toFixed(4),
+        currentNAV: lastNav.toFixed(4),
+        lastUpdated: sortedNav[sortedNav.length - 1].dateStr,
+        breakdown
+    };
+  };
+
+  const calculatePortfolio = (portfolio) => {
+    if (!portfolio || portfolio.length === 0) return null;
+
+    const individualResults = portfolio.map(p => {
+      const res = calculateRealSIP(p.navData, p.inputs);
+      if (res) return { ...res, id: p.id, name: p.fund.schemeName };
+      return null;
+    });
+    const validResults = individualResults.filter(r => r !== null);
+    if (validResults.length === 0) return null;
+
+    let totalCurrentValue = new Decimal(0);
+    let totalInvested = new Decimal(0);
+    let allTransactions = [];
+    const dateMap = new Map();
+
+    validResults.forEach(res => {
+      totalCurrentValue = totalCurrentValue.plus(res.currentValue);
+      totalInvested = totalInvested.plus(res.totalInvested);
+      if (res.xirrTransactions) allTransactions = allTransactions.concat(res.xirrTransactions);
+
+      res.breakdown.forEach(point => {
+        const dateKey = point.date.getTime();
+        if (!dateMap.has(dateKey)) {
+          dateMap.set(dateKey, { 
+            date: point.date, 
+            dateStr: point.name, 
+            Invested: new Decimal(0), 
+            TotalValue: new Decimal(0) 
+          });
+        }
+        const entry = dateMap.get(dateKey);
+        entry.Invested = entry.Invested.plus(point.Invested);
+        entry.TotalValue = entry.TotalValue.plus(point.TotalValue);
+      });
+    });
+
+    const breakdown = Array.from(dateMap.values())
+      .sort((a, b) => a.date - b.date)
+      .map(b => ({
+        name: b.dateStr,
+        date: b.date,
+        Invested: b.Invested.toNumber(),
+        TotalValue: b.TotalValue.toNumber(),
+        NAV: 0
+      }));
+
+    const absoluteReturn = totalInvested.gt(0) 
+      ? totalCurrentValue.minus(totalInvested).div(totalInvested).times(100) 
+      : new Decimal(0);
+    
+    const xirr = calculateXIRR(allTransactions);
+
+    return {
+      currentValue: totalCurrentValue.toFixed(2),
+      totalInvested: totalInvested.toFixed(2),
+      absoluteReturn: absoluteReturn.toFixed(2),
+      xirr: xirr.toFixed(2),
+      breakdown,
+      fundDetails: validResults
+    };
+  };
+
+  // --- API Services ---
+  const getFundList = async (forceRefresh = false) => {
+    const CACHE_KEY = 'mf_fund_list';
+    const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+    try {
+      if (!forceRefresh) {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { timestamp, data } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            return data;
+          }
+        }
+      }
+
+      const res = await fetch('https://api.mfapi.in/mf');
+      if (!res.ok) throw new Error('Failed to fetch fund list');
+      const data = await res.json();
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data })); } catch (e) { console.warn('Cache failed', e); }
+      return data;
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  };
+
+  const getFundNAV = async (schemeCode) => {
+    try {
+      const res = await fetch(`https://api.mfapi.in/mf/${schemeCode}`);
+      if (!res.ok) throw new Error('Failed to fetch NAV data');
+      const data = await res.json();
+      return data.data || [];
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  };
+
+  return { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculateRealSIP, calculatePortfolio, getFundList, getFundNAV };
 };
