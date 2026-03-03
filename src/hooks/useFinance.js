@@ -438,7 +438,11 @@ export const useFinance = () => {
   const calculatePortfolio = (portfolio) => {
     if (!portfolio || portfolio.length === 0) return null;
 
-    const individualResults = portfolio.map(p => calculateRealSIP(p.navData, p.inputs));
+    const individualResults = portfolio.map(p => {
+      const res = calculateRealSIP(p.navData, p.inputs);
+      if (res) return { ...res, id: p.id, name: p.fund.schemeName };
+      return null;
+    });
     const validResults = individualResults.filter(r => r !== null);
     if (validResults.length === 0) return null;
 
@@ -489,7 +493,8 @@ export const useFinance = () => {
       totalInvested: totalInvested.toFixed(2),
       absoluteReturn: absoluteReturn.toFixed(2),
       xirr: xirr.toFixed(2),
-      breakdown
+      breakdown,
+      fundDetails: validResults
     };
   };
 

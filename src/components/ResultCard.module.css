@@ -26,3 +26,9 @@
   display: block;
   /* Dynamic style (color) is applied inline */
 }
+
+@media (max-width: 768px) {
+  .resultCard {
+    padding: 15px;
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useFinance } from '../hooks/useFinance';
 import WealthChart from './WealthChart';
 import DualInput from './DualInput';
@@ -44,6 +44,18 @@ const Wealth = () => {
     stepUpPercent: 0,
     stepUpValue: 0
   });
+  
+  const [viewingId, setViewingId] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState(null);
+  const [deletedItem, setDeletedItem] = useState(null);
+  const [showToast, setShowToast] = useState(false);
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    setViewingId(null);
+  }, [currentMenu]);
   
   // Save Portfolio to LocalStorage
   useEffect(() => {
@@ -127,12 +139,157 @@ const Wealth = () => {
 
   // Remove Fund
   const handleRemoveFund = (id) => {
-    setPortfolio(portfolio.filter(p => p.id !== id));
+    setDeleteConfirmationId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmationId) {
+      const itemToDelete = portfolio.find(p => p.id === deleteConfirmationId);
+      setDeletedItem(itemToDelete);
+      setPortfolio(portfolio.filter(p => p.id !== deleteConfirmationId));
+      
+      if (viewingId === deleteConfirmationId) setViewingId(null);
+      setDeleteConfirmationId(null);
+      setShowToast(true);
+    }
+  };
+
+  const handleUndo = () => {
+    if (deletedItem) {
+      setPortfolio(prev => [...prev, deletedItem]);
+      setShowToast(false);
+      setDeletedItem(null);
+    }
+  };
+
+  useEffect(() => {
+    let timer;
+    if (showToast) {
+      timer = setTimeout(() => setShowToast(false), 4000);
+    }
+    return () => clearTimeout(timer);
+  }, [showToast, deletedItem]);
+
+  const handleClearPortfolio = () => {
+    setPortfolio([]);
+    setShowClearConfirmation(false);
+  };
+
+  // Export to CSV
+  const downloadCSV = () => {
+    if (!portfolio || portfolio.length === 0) return;
+    
+    const headers = ['Scheme Code', 'Fund Name', 'Start Date', 'SIP Amount', 'Lumpsum', 'Total Invested', 'Current Value', 'Abs Return (%)', 'XIRR (%)'];
+    
+    const rows = portfolio.map(item => {
+      const stats = baseResults?.fundDetails?.find(f => f.id === item.id);
+      return [
+        item.fund.schemeCode,
+        `"${item.fund.schemeName.replace(/"/g, '""')}"`,
+        item.inputs.startDate,
+        item.inputs.amount,
+        item.inputs.lumpsum,
+        stats?.totalInvested || 0,
+        stats?.currentValue || 0,
+        stats?.absoluteReturn || 0,
+        stats?.xirr || 0
+      ];
+    });
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `portfolio_tracker_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+  };
+
+  // Import CSV
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setTrackerLoading(true);
+    try {
+      // Ensure fund list is available for name lookups
+      let currentFundList = fundList;
+      if (currentFundList.length === 0) {
+        currentFundList = await getFundList();
+        setFundList(currentFundList || []);
+      }
+
+      const text = await file.text();
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+      if (lines.length < 2) throw new Error("Invalid CSV format");
+
+      // Detect columns (Case insensitive)
+      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+      const colMap = {
+        code: headers.findIndex(h => h.includes('code')),
+        name: headers.findIndex(h => h.includes('name') || h.includes('fund')),
+        date: headers.findIndex(h => h.includes('date') || h.includes('start')),
+        sip: headers.findIndex(h => h.includes('sip') || h.includes('amount')),
+        lumpsum: headers.findIndex(h => h.includes('lumpsum'))
+      };
+
+      const newItems = [];
+      
+      // Process rows (Skip header)
+      for (let i = 1; i < lines.length; i++) {
+        // Split by comma, handling quotes
+        const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(val => val.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+        
+        const schemeCode = colMap.code > -1 ? row[colMap.code] : null;
+        const schemeName = colMap.name > -1 ? row[colMap.name] : null;
+        const startDate = colMap.date > -1 ? row[colMap.date] : null;
+        const sipAmount = colMap.sip > -1 ? parseFloat(row[colMap.sip]) || 0 : 0;
+        const lumpsum = colMap.lumpsum > -1 ? parseFloat(row[colMap.lumpsum]) || 0 : 0;
+
+        if (!startDate) continue;
+
+        // Identify Fund
+        let fund = null;
+        if (schemeCode) fund = currentFundList?.find(f => String(f.schemeCode) === String(schemeCode));
+        if (!fund && schemeName) fund = currentFundList?.find(f => f.schemeName.toLowerCase() === schemeName.toLowerCase());
+        
+        // Fallback if code exists but not in list (fetch anyway)
+        if (!fund && schemeCode) fund = { schemeCode, schemeName: schemeName || `Fund ${schemeCode}` };
+
+        if (fund) {
+          const navData = await getFundNAV(fund.schemeCode);
+          if (navData && navData.length > 0) {
+            newItems.push({
+              id: Date.now() + i,
+              fund,
+              inputs: { startDate, amount: sipAmount, lumpsum, stepUpPercent: 0, stepUpValue: 0 },
+              navData
+            });
+          }
+        }
+      }
+
+      if (newItems.length > 0) {
+        setPortfolio(prev => [...prev, ...newItems]);
+        alert(`Successfully imported ${newItems.length} funds.`);
+      } else {
+        alert("No valid funds found. Please check CSV format (Requires 'Scheme Code' or 'Fund Name', and 'Start Date').");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to import CSV. Please check the file format.");
+    } finally {
+      setTrackerLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   // 1. Unified Calculation Engine
   // Inside Wealth.jsx
-  const results = useMemo(() => {
+  const baseResults = useMemo(() => {
     if (currentMenu === 'SIP') {
       const sipData = calculateSIP(
         inputs.sip.amount, inputs.sip.rate, inputs.sip.years,
@@ -181,7 +338,68 @@ const Wealth = () => {
     }
     return null;
   }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, portfolio, calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculatePortfolio]);
+
+  // When portfolio is cleared, also clear viewingId
+  useEffect(() => {
+    if (portfolio.length === 0) setViewingId(null);
+  }, [portfolio]);
+
+  // Filter results based on selection (for Tracker)
+  const results = useMemo(() => {
+    if (currentMenu === 'Tracker' && baseResults) {
+      if (viewingId && baseResults.fundDetails) {
+        const specific = baseResults.fundDetails.find(f => f.id === viewingId);
+        return specific || baseResults;
+      }
+      return baseResults;
+    }
+    return baseResults;
+  }, [baseResults, viewingId, currentMenu]);
   
+  // Sorting Logic
+  const sortedPortfolio = useMemo(() => {
+    let sortableItems = [...portfolio];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        const statsA = baseResults?.fundDetails?.find(f => f.id === a.id);
+        const statsB = baseResults?.fundDetails?.find(f => f.id === b.id);
+        
+        let aValue, bValue;
+        
+        if (sortConfig.key === 'fund') {
+            aValue = a.fund.schemeName.toLowerCase();
+            bValue = b.fund.schemeName.toLowerCase();
+        } else if (sortConfig.key === 'invested') {
+            aValue = parseFloat(statsA?.totalInvested || 0);
+            bValue = parseFloat(statsB?.totalInvested || 0);
+        } else if (sortConfig.key === 'value') {
+            aValue = parseFloat(statsA?.currentValue || 0);
+            bValue = parseFloat(statsB?.currentValue || 0);
+        } else if (sortConfig.key === 'xirr') {
+            aValue = parseFloat(statsA?.xirr || 0);
+            bValue = parseFloat(statsB?.xirr || 0);
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [portfolio, sortConfig, baseResults]);
+
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   // 2. Chart Data Mapper
   const chartData = useMemo(() => {
     if (currentMenu === 'SIP') {
@@ -245,6 +463,10 @@ const Wealth = () => {
     return [];
   }, [results, currentMenu, activeTab, inputs.loan.principal, inputs.swp.initialCorpus, trackerInputs]);
 
+  // Determine if middle pane should be visible (Hidden when viewing Tracker list)
+  const showMiddlePane = currentMenu !== 'Tracker' || isAddingFund || portfolio.length === 0;
+  const showRightPane = currentMenu !== 'Tracker' || isAddingFund || portfolio.length === 0;
+
   return (
     <div className={styles.wealthPlannerRoot}>
       <div className={styles.mainContent}>
@@ -264,7 +486,7 @@ const Wealth = () => {
             <CalculatorGuide />
           ) : (
           <>
-          <div className={styles.controlGrid}>
+          <div className={`${styles.controlGrid} ${!showMiddlePane ? (showRightPane ? styles.controlGridExpanded : styles.controlGridFull) : ''}`}>
             {/* Left: Input Section */}
             <div className={styles.innerCard}>
               <p className={styles.cardHeading}>{currentMenu} Details</p>
@@ -326,26 +548,88 @@ const Wealth = () => {
               {currentMenu === 'Tracker' && (
                 <>
                   {!isAddingFund && portfolio.length > 0 ? (
-                    <div className={styles.portfolioList}>
-                      <button onClick={() => { setIsAddingFund(true); setEditingId(null); setSelectedFund(null); setNavData([]); setSearchQuery(''); }} className={styles.addFundBtn}>+ Add Another Fund</button>
-                      {portfolio.map(item => (
-                        <div key={item.id} className={styles.portfolioItem}>
-                          <div className={styles.portfolioItemInfo}>
-                            <p className={styles.portfolioItemTitle}>{item.fund.schemeName}</p>
-                            <p className={styles.portfolioItemSubtitle}>
-                              SIP: ₹{item.inputs.amount} | Start: {item.inputs.startDate}
-                            </p>
-                          </div>
-                          <div className={styles.portfolioActions}>
-                            <button onClick={() => handleEditFund(item)} className={`${styles.actionBtn} ${styles.editBtn}`}>Edit</button>
-                            <button onClick={() => handleRemoveFund(item.id)} className={`${styles.actionBtn} ${styles.deleteBtn}`}>Remove</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <>
+                      {viewingId && (
+                        <button onClick={() => setViewingId(null)} className={styles.viewAllBtn}>
+                          ← Back to Full Portfolio
+                        </button>
+                      )}
+                      <div className={styles.trackerTableContainer}>
+                        <table className={styles.trackerTable}>
+                          <thead>
+                            <tr>
+                              <th onClick={() => requestSort('fund')} style={{cursor: 'pointer'}}>
+                                Fund {sortConfig.key === 'fund' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                              </th>
+                              <th onClick={() => requestSort('invested')} style={{cursor: 'pointer'}}>
+                                Invested {sortConfig.key === 'invested' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                              </th>
+                              <th onClick={() => requestSort('value')} style={{cursor: 'pointer'}}>
+                                Value {sortConfig.key === 'value' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                              </th>
+                              <th onClick={() => requestSort('xirr')} style={{cursor: 'pointer'}}>
+                                XIRR {sortConfig.key === 'xirr' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                              </th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortedPortfolio.map(item => {
+                              const stats = baseResults?.fundDetails?.find(f => f.id === item.id);
+                              return (
+                                <tr key={item.id} 
+                                    className={`${styles.trackerRow} ${viewingId === item.id ? styles.trackerRowSelected : ''}`}
+                                    onClick={() => setViewingId(item.id)}
+                                >
+                                  <td>
+                                    <span className={styles.fundName} title={item.fund.schemeName}>{item.fund.schemeName}</span>
+                                    <span className={styles.fundMeta}>{item.inputs.startDate}</span>
+                                  </td>
+                                  <td data-label="Invested" style={{color: '#64748B'}}>
+                                    ₹{Number(stats?.totalInvested || 0).toLocaleString('en-IN')}
+                                  </td>
+                                  <td data-label="Value">
+                                    <div style={{fontWeight: 'bold'}}>₹{Number(stats?.currentValue || 0).toLocaleString('en-IN')}</div>
+                                    <div style={{fontSize: '10px', color: (stats?.absoluteReturn || 0) >= 0 ? '#10B981' : '#EF4444'}}>{stats?.absoluteReturn}%</div>
+                                  </td>
+                                  <td data-label="XIRR" style={{fontWeight: '600', color: (stats?.xirr || 0) >= 0 ? '#10B981' : '#EF4444'}}>{stats?.xirr}%</td>
+                                  <td onClick={(e) => e.stopPropagation()}>
+                                    <button onClick={() => handleEditFund(item)} className={styles.iconBtn} title="Edit">✎</button>
+                                    <button onClick={() => handleRemoveFund(item.id)} className={styles.iconBtn} style={{color: '#EF4444'}} title="Remove">×</button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className={styles.trackerFooter}>
+                              <td>Total</td>
+                              <td data-label="Total Invested">₹{Number(baseResults?.totalInvested || 0).toLocaleString('en-IN')}</td>
+                              <td data-label="Total Value">
+                                <div>₹{Number(baseResults?.currentValue || 0).toLocaleString('en-IN')}</div>
+                                <div style={{fontSize: '10px', color: (baseResults?.absoluteReturn || 0) >= 0 ? '#10B981' : '#EF4444'}}>
+                                  {baseResults?.absoluteReturn}%
+                                </div>
+                              </td>
+                              <td data-label="Total XIRR" style={{color: (baseResults?.xirr || 0) >= 0 ? '#10B981' : '#EF4444'}}>
+                                {baseResults?.xirr}%
+                              </td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                      <div className={styles.trackerActionRow}>
+                        <button onClick={() => { setIsAddingFund(true); setEditingId(null); setSelectedFund(null); setNavData([]); setSearchQuery(''); }} className={styles.addFundBtn}>+ Add Fund</button>
+                        <button onClick={downloadCSV} className={styles.exportBtn}>Export CSV</button>
+                        <button onClick={handleImportClick} className={styles.importBtn}>Import CSV</button>
+                        <button onClick={() => setShowClearConfirmation(true)} className={styles.clearBtn}>Clear Portfolio</button>
+                      </div>
+                    </>
                   ) : (
                     <>
                     {!selectedFund ? (
+                    <>
                     <div className={styles.searchContainer}>
                       <div className={styles.searchHeader}>
                         <label className={styles.label}>Search Mutual Fund</label>
@@ -375,6 +659,16 @@ const Wealth = () => {
                       </datalist>
                       {trackerLoading && <p className={styles.loadingText}>Loading funds...</p>}
                     </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', margin: '10px 0 20px 0' }}>
+                      <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
+                      <span style={{ padding: '0 10px', color: '#94A3B8', fontSize: '12px', fontWeight: '600' }}>OR</span>
+                      <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
+                    </div>
+                    <button onClick={handleImportClick} className={styles.importBtn} style={{ width: '100%', marginBottom: '20px' }}>
+                      Import Portfolio from CSV
+                    </button>
+                    </>
                   ) : (
                     <div className={styles.selectedFundBox}>
                       <strong>{selectedFund.schemeName}</strong>
@@ -403,6 +697,7 @@ const Wealth = () => {
             </div>
 
             {/* Middle: Strategy/Extra Options */}
+            {showMiddlePane && (
             <div className={styles.innerCard}>
               {currentMenu === 'Loan' ? (
                 <>
@@ -473,8 +768,10 @@ const Wealth = () => {
                 <p className={styles.noStrategyText}>No additional strategy available for this mode.</p>
               )}
             </div>
+            )}
 
             {/* Right: Maturity Results */}
+            {showRightPane && (
             <div className={styles.resultsColumn}>
               {currentMenu === 'SIP' && (
                 <>
@@ -531,13 +828,14 @@ const Wealth = () => {
               )}
               {currentMenu === 'Tracker' && results && portfolio.length > 0 && (
                 <>
-                  <ResultCard active label="CURRENT VALUE" color="#10B981" value={results.currentValue} />
+                  <ResultCard active label={viewingId ? "CURRENT VALUE (SELECTED)" : "TOTAL CURRENT VALUE"} color="#10B981" value={results.currentValue} />
                   <ResultCard active={false} label="TOTAL INVESTED" color="#64748B" value={results.totalInvested} />
                   <ResultCard active={false} label="ABS RETURNS" color={results.absoluteReturn >= 0 ? "#10B981" : "#EF4444"} value={`${results.absoluteReturn}%`} />
                   <ResultCard active={false} label="XIRR" color={results.xirr >= 0 ? "#10B981" : "#EF4444"} value={`${results.xirr}%`} />
                 </>
               )}
             </div>
+            )}
           </div>
 
           {/* Chart View */}
@@ -580,7 +878,7 @@ const Wealth = () => {
               ) : currentMenu === 'Tracker' ? (
                 <WealthChart
                   data={chartData}
-                  primaryDataKey="TotalValue"
+                  primaryDataKey={viewingId ? "TotalValue" : "TotalValue"}
                   primaryName="Current Value"
                   primaryColor="#10B981"
                   secondaryDataKey="Invested"
@@ -735,6 +1033,51 @@ const Wealth = () => {
           </>
           )}
         </div>
+
+        {/* Confirmation Modal */}
+        {deleteConfirmationId && (
+          <div className={styles.modalOverlay}>
+            <div className={styles.modalContent}>
+              <h3 className={styles.modalTitle}>Remove Fund?</h3>
+              <p className={styles.modalText}>Are you sure you want to remove this fund from your portfolio? This action cannot be undone.</p>
+              <div className={styles.modalActions}>
+                <button onClick={() => setDeleteConfirmationId(null)} className={`${styles.modalBtn} ${styles.modalCancelBtn}`}>Cancel</button>
+                <button onClick={confirmDelete} className={`${styles.modalBtn} ${styles.modalDeleteBtn}`}>Remove</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Clear All Confirmation Modal */}
+        {showClearConfirmation && (
+          <div className={styles.modalOverlay}>
+            <div className={styles.modalContent}>
+              <h3 className={styles.modalTitle}>Clear Entire Portfolio?</h3>
+              <p className={styles.modalText}>Are you sure you want to remove ALL funds from your portfolio? This action is permanent and cannot be undone.</p>
+              <div className={styles.modalActions}>
+                <button onClick={() => setShowClearConfirmation(false)} className={`${styles.modalBtn} ${styles.modalCancelBtn}`}>Cancel</button>
+                <button onClick={handleClearPortfolio} className={`${styles.modalBtn} ${styles.modalDeleteBtn}`}>Clear All</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Undo Toast */}
+        {showToast && (
+          <div className={styles.toast}>
+            <span>Fund removed</span>
+            <button onClick={handleUndo} className={styles.undoBtn}>Undo</button>
+            <button onClick={() => setShowToast(false)} className={styles.closeToastBtn}>✕</button>
+          </div>
+        )}
+
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          style={{display: 'none'}} 
+          accept=".csv" 
+          onChange={handleFileChange} 
+        />
       </div>
     </div>
   );

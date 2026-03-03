@@ -42,3 +42,9 @@
   width: 100%;
   accent-color: #3B82F6;
 }
+
+@media (max-width: 768px) {
+  .dualInput {
+    margin-bottom: 15px;
+  }
+}
