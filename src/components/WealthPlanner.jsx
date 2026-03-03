@@ -51,7 +51,10 @@ const Wealth = () => {
   const [deletedItem, setDeletedItem] = useState(null);
   const [showToast, setShowToast] = useState(false);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [investmentMode, setInvestmentMode] = useState('SIP'); // 'SIP', 'Lumpsum', 'Both'
   const fileInputRef = useRef(null);
+  const sidebarRef = useRef(null);
 
   useEffect(() => {
     setViewingId(null);
@@ -135,6 +138,11 @@ const Wealth = () => {
     setNavData(item.navData);
     setEditingId(item.id);
     setIsAddingFund(true);
+
+    // Determine mode based on values
+    if (item.inputs.amount > 0 && item.inputs.lumpsum > 0) setInvestmentMode('Both');
+    else if (item.inputs.lumpsum > 0) setInvestmentMode('Lumpsum');
+    else setInvestmentMode('SIP');
   };
 
   // Remove Fund
@@ -174,6 +182,20 @@ const Wealth = () => {
     setPortfolio([]);
     setShowClearConfirmation(false);
   };
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isMobileMenuOpen && sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMobileMenuOpen]);
 
   // Export to CSV
   const downloadCSV = () => {
@@ -471,13 +493,21 @@ const Wealth = () => {
     <div className={styles.wealthPlannerRoot}>
       <div className={styles.mainContent}>
         {/* Left Sidebar */}
-        <aside className={styles.sidebar}>
-          <h2 className={styles.sidebarTitle}>Calculators</h2>
-          <div className={styles.sidebarMenu}>
+        <aside className={styles.sidebar} ref={sidebarRef}>
+          <div className={styles.sidebarHeader}>
+            <h2 className={styles.sidebarTitle}>Calculators</h2>
+            <button 
+              className={styles.mobileMenuToggle} 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              {isMobileMenuOpen ? '✕' : '☰'}
+            </button>
+          </div>
+          <div className={`${styles.sidebarMenu} ${isMobileMenuOpen ? styles.mobileMenuOpen : ''}`}>
             {['SIP', 'Lumpsum', 'RD', 'Loan', 'SWP', 'Tracker'].map(m => (
-              <button key={m} onClick={() => setCurrentMenu(m)} className={`${styles.sidebarBtn} ${currentMenu === m ? styles.sidebarBtnActive : ''}`}>{m}</button>
+              <button key={m} onClick={() => { setCurrentMenu(m); setIsMobileMenuOpen(false); }} className={`${styles.sidebarBtn} ${currentMenu === m ? styles.sidebarBtnActive : ''}`}>{m}</button>
             ))}
-            <button onClick={() => setCurrentMenu('Help')} className={`${styles.sidebarBtn} ${currentMenu === 'Help' ? styles.sidebarBtnActive : ''}`}>Help</button>
+            <button onClick={() => { setCurrentMenu('Help'); setIsMobileMenuOpen(false); }} className={`${styles.sidebarBtn} ${currentMenu === 'Help' ? styles.sidebarBtnActive : ''}`}>Help</button>
           </div>
         </aside>
 
@@ -583,7 +613,11 @@ const Wealth = () => {
                                 >
                                   <td>
                                     <span className={styles.fundName} title={item.fund.schemeName}>{item.fund.schemeName}</span>
-                                    <span className={styles.fundMeta}>{item.inputs.startDate}</span>
+                                    <span className={styles.fundMeta}>
+                                      {item.inputs.amount > 0 && `SIP: ₹${Number(item.inputs.amount).toLocaleString('en-IN')} | `}
+                                      {item.inputs.lumpsum > 0 && `Lumpsum: ₹${Number(item.inputs.lumpsum).toLocaleString('en-IN')} | `}
+                                      Start: {item.inputs.startDate}
+                                    </span>
                                   </td>
                                   <td data-label="Invested" style={{color: '#64748B'}}>
                                     ₹{Number(stats?.totalInvested || 0).toLocaleString('en-IN')}
@@ -620,7 +654,15 @@ const Wealth = () => {
                         </table>
                       </div>
                       <div className={styles.trackerActionRow}>
-                        <button onClick={() => { setIsAddingFund(true); setEditingId(null); setSelectedFund(null); setNavData([]); setSearchQuery(''); }} className={styles.addFundBtn}>+ Add Fund</button>
+                        <button onClick={() => { 
+                          setIsAddingFund(true); 
+                          setEditingId(null); 
+                          setSelectedFund(null); 
+                          setNavData([]); 
+                          setSearchQuery('');
+                          setTrackerInputs({ startDate: '2020-01-01', amount: 5000, lumpsum: 0, stepUpPercent: 0, stepUpValue: 0 });
+                          setInvestmentMode('SIP');
+                        }} className={styles.addFundBtn}>+ Add Fund</button>
                         <button onClick={downloadCSV} className={styles.exportBtn}>Export CSV</button>
                         <button onClick={handleImportClick} className={styles.importBtn}>Import CSV</button>
                         <button onClick={() => setShowClearConfirmation(true)} className={styles.clearBtn}>Clear Portfolio</button>
@@ -681,10 +723,25 @@ const Wealth = () => {
                     <label className={styles.label}>Start Date</label>
                     <input type="date" value={trackerInputs.startDate} onChange={(e) => setTrackerInputs({...trackerInputs, startDate: e.target.value})} className={styles.dateInput} />
                   </div>
-                  <DualInput label="Monthly SIP" symbol="₹" value={trackerInputs.amount} min={0} max={100000} step={500}
-                    onChange={(v) => setTrackerInputs({ ...trackerInputs, amount: v })} />
-                  <DualInput label="Initial Lumpsum" symbol="₹" value={trackerInputs.lumpsum} min={0} max={1000000} step={5000}
-                    onChange={(v) => setTrackerInputs({ ...trackerInputs, lumpsum: v })} />
+
+                  <div className={styles.inputGroup}>
+                    <label className={styles.label}>Investment Type</label>
+                    <div className={styles.toggleWrapper} style={{ width: '100%', boxSizing: 'border-box', display: 'flex' }}>
+                      <button onClick={() => { setInvestmentMode('SIP'); setTrackerInputs(p => ({...p, lumpsum: 0, amount: p.amount || 5000})); }} className={`${styles.toggleBtn} ${investmentMode === 'SIP' ? styles.toggleBtnActive : ''}`} style={{flex: 1}}>SIP</button>
+                      <button onClick={() => { setInvestmentMode('Lumpsum'); setTrackerInputs(p => ({...p, amount: 0, lumpsum: p.lumpsum || 50000})); }} className={`${styles.toggleBtn} ${investmentMode === 'Lumpsum' ? styles.toggleBtnActive : ''}`} style={{flex: 1}}>Lumpsum</button>
+                      <button onClick={() => { setInvestmentMode('Both'); setTrackerInputs(p => ({...p, amount: p.amount || 5000, lumpsum: p.lumpsum || 50000})); }} className={`${styles.toggleBtn} ${investmentMode === 'Both' ? styles.toggleBtnActive : ''}`} style={{flex: 1}}>Both</button>
+                    </div>
+                  </div>
+
+                  {(investmentMode === 'SIP' || investmentMode === 'Both') && (
+                    <DualInput label="Monthly SIP" symbol="₹" value={trackerInputs.amount} min={0} max={100000} step={500}
+                      onChange={(v) => setTrackerInputs({ ...trackerInputs, amount: v })} />
+                  )}
+                  
+                  {(investmentMode === 'Lumpsum' || investmentMode === 'Both') && (
+                    <DualInput label="Initial Lumpsum" symbol="₹" value={trackerInputs.lumpsum} min={0} max={1000000} step={5000}
+                      onChange={(v) => setTrackerInputs({ ...trackerInputs, lumpsum: v })} />
+                  )}
 
                   <button onClick={handleAddToPortfolio} disabled={!selectedFund || trackerLoading} className={styles.addFundBtn} style={{ marginTop: '20px' }}>
                     {trackerLoading ? 'Loading...' : (editingId ? 'Update Portfolio' : 'Add to Portfolio')}
