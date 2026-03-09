@@ -54,7 +54,7 @@ The `calculateXIRR` function uses an iterative Newton-Raphson method which can b
 
 ### A. Unit Testing
 There are no tests visible in the repository.
-- [ ] **Recommendation**: Add unit tests for `useFinance.js` using Jest or Vitest. Financial logic must be tested against known scenarios to ensure accuracy.
+- [x] **Recommendation**: Add unit tests for `useFinance.js` using Jest or Vitest. Financial logic must be tested against known scenarios to ensure accuracy.
 
 ### B. Error Handling
 The API calls in `useFinance.js` catch errors but only log them to the console.
