@@ -7,6 +7,7 @@ import styles from './WealthPlanner.module.css';
 import CalculatorGuide from './CalculatorGuide';
 import InputSection from './InputSection';
 import ResultsSection from './ResultsSection';
+import CalculatorLayout from './CalculatorLayout';
 
 const Wealth = () => {
   const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculateRealSIP, calculatePortfolio, getFundList, getFundNAV } = useFinance();
@@ -56,7 +57,6 @@ const Wealth = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [investmentMode, setInvestmentMode] = useState('SIP'); // 'SIP', 'Lumpsum', 'Both'
   const fileInputRef = useRef(null);
-  const sidebarRef = useRef(null);
 
   useEffect(() => {
     setViewingId(null);
@@ -184,20 +184,6 @@ const Wealth = () => {
     setPortfolio([]);
     setShowClearConfirmation(false);
   };
-
-  // Close mobile menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isMobileMenuOpen && sidebarRef.current && !sidebarRef.current.contains(event.target)) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isMobileMenuOpen]);
 
   // Import CSV
   const handleImportClick = () => {
@@ -421,28 +407,12 @@ const Wealth = () => {
   const showRightPane = currentMenu !== 'Tracker' || isAddingFund || portfolio.length === 0;
 
   return (
-    <div className={styles.wealthPlannerRoot}>
-      <div className={styles.mainContent}>
-        {/* Left Sidebar */}
-        <aside className={styles.sidebar} ref={sidebarRef}>
-          <div className={styles.sidebarHeader}>
-            <h2 className={styles.sidebarTitle}>Calculators</h2>
-            <button 
-              className={styles.mobileMenuToggle} 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              {isMobileMenuOpen ? '✕' : '☰'}
-            </button>
-          </div>
-          <div className={`${styles.sidebarMenu} ${isMobileMenuOpen ? styles.mobileMenuOpen : ''}`}>
-            {['SIP', 'Lumpsum', 'RD', 'Loan', 'SWP', 'Tracker'].map(m => (
-              <button key={m} onClick={() => { setCurrentMenu(m); setIsMobileMenuOpen(false); }} className={`${styles.sidebarBtn} ${currentMenu === m ? styles.sidebarBtnActive : ''}`}>{m}</button>
-            ))}
-            <button onClick={() => { setCurrentMenu('Help'); setIsMobileMenuOpen(false); }} className={`${styles.sidebarBtn} ${currentMenu === 'Help' ? styles.sidebarBtnActive : ''}`}>Help</button>
-          </div>
-        </aside>
-
-        <div className={styles.mainPanel}>
+    <CalculatorLayout
+      currentMenu={currentMenu}
+      setCurrentMenu={setCurrentMenu}
+      isMobileMenuOpen={isMobileMenuOpen}
+      setIsMobileMenuOpen={setIsMobileMenuOpen}
+    >
           {currentMenu === 'Help' ? (
             <CalculatorGuide />
           ) : (
@@ -788,7 +758,6 @@ const Wealth = () => {
           )}
           </>
           )}
-        </div>
 
         {/* Confirmation Modal */}
         {deleteConfirmationId && (
@@ -834,8 +803,7 @@ const Wealth = () => {
           accept=".csv" 
           onChange={handleFileChange} 
         />
-      </div>
-    </div>
+    </CalculatorLayout>
   );
 };
 
