@@ -103,6 +103,16 @@ const InputSection = ({
             onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, annualRate: v } })} />
         </>
       )}
+      {currentMenu === 'Goal' && (
+        <>
+          <DualInput label="Target Amount" symbol="₹" value={inputs.goal.targetAmount} min={100000} max={500000000} step={100000}
+            onChange={(v) => setInputs({ ...inputs, goal: { ...inputs.goal, targetAmount: v } })} />
+          <DualInput label="Expected Return" symbol="%" value={inputs.goal.rate} min={1} max={30} step={0.5}
+            onChange={(v) => setInputs({ ...inputs, goal: { ...inputs.goal, rate: v } })} />
+          <DualInput label="Time Period" symbol="Yrs" value={inputs.goal.years} min={1} max={40} step={1}
+            onChange={(v) => setInputs({ ...inputs, goal: { ...inputs.goal, years: v } })} />
+        </>
+      )}
       {currentMenu === 'Tracker' && (
         <>
           {!isAddingFund && portfolio.length > 0 ? (

@@ -14,7 +14,7 @@ The `WealthPlanner.jsx` file currently acts as a "God Component," handling routi
 
 ### B. TypeScript Migration
 Financial applications rely heavily on precise data structures and number handling.
-- [ ] **Recommendation**: Migrate `useFinance.js` and `WealthPlanner.jsx` to TypeScript. Defining interfaces for `SIPResult`, `LoanResult`, and `PortfolioItem` will prevent runtime errors and make the complex data flow easier to maintain.
+- [x] **Recommendation**: Migrate `useFinance.js` and `WealthPlanner.jsx` to TypeScript. Defining interfaces for `SIPResult`, `LoanResult`, and `PortfolioItem` will prevent runtime errors and make the complex data flow easier to maintain.
 
 ### C. Standardized Calculation Interface
 Currently, `useFinance.js` returns different structures for different calculators.
@@ -28,7 +28,7 @@ The current calculators show pre-tax returns.
 
 ### B. Goal-Based Planning (Reverse Calculator)
 Users often know *what* they want (e.g., ₹1 Crore in 10 years) but not *how* to get there.
-- [ ] **Recommendation**: Add a "Goal Planner" mode. Given `Target Amount`, `Tenure`, and `Rate`, calculate the required `Monthly SIP`.
+- [x] **Recommendation**: Add a "Goal Planner" mode. Given `Target Amount`, `Tenure`, and `Rate`, calculate the required `Monthly SIP`.
 
 ### C. PDF Export
 - [ ] **Recommendation**: Allow users to download a PDF report of their financial plan, including the chart and the breakdown table, using libraries like `jspdf` or `html2canvas`.

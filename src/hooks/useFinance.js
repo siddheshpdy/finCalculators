@@ -563,5 +563,53 @@ export const useFinance = () => {
     }
   };
 
-  return { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculateRealSIP, calculatePortfolio, getFundList, getFundNAV };
+  // Goal Planner: Calculate required SIP for a target corpus
+  const calculateGoalSIP = (targetAmount, annualRate, years) => {
+    const FV = new Decimal(targetAmount || 0);
+    const r = new Decimal(annualRate || 0).div(100).div(12);
+    const n = new Decimal(years || 0).times(12);
+
+    if (n.lte(0)) return null;
+
+    let monthlyInvestment;
+
+    if (r.eq(0)) {
+      monthlyInvestment = FV.div(n);
+    } else {
+      // Formula: P = FV / [ ((1+r)^n - 1) / r * (1+r) ]
+      const onePlusR = r.plus(1);
+      const denominator = onePlusR.pow(n).minus(1).div(r).times(onePlusR);
+      monthlyInvestment = FV.div(denominator);
+    }
+
+    const totalInvested = monthlyInvestment.times(n);
+    
+    const breakdown = [];
+    let balance = new Decimal(0);
+    let invested = new Decimal(0);
+    const onePlusR = r.plus(1);
+    const totalMonths = n.toNumber();
+
+    for (let m = 1; m <= totalMonths; m++) {
+        invested = invested.plus(monthlyInvestment);
+        balance = balance.plus(monthlyInvestment).times(onePlusR);
+        
+        if (m % 12 === 0) {
+            breakdown.push({
+                name: `Year ${m / 12}`,
+                Invested: invested.toNumber(),
+                TotalValue: balance.toNumber()
+            });
+        }
+    }
+
+    return {
+        requiredSIP: monthlyInvestment.toFixed(2),
+        totalInvested: totalInvested.toFixed(2),
+        maturityValue: balance.toFixed(2),
+        breakdown
+    };
+  };
+
+  return { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculateRealSIP, calculatePortfolio, getFundList, getFundNAV, calculateGoalSIP };
 };

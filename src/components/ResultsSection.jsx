@@ -70,6 +70,13 @@ const ResultsSection = ({
           <ResultCard active={false} label="Final Balance" color="#64748B" value={results.finalBalance} />
         </>
       )}
+      {currentMenu === 'Goal' && results && (
+        <>
+          <ResultCard active label="REQUIRED MONTHLY SIP" color="#EF4444" value={results.requiredSIP} />
+          <ResultCard active={false} label="TOTAL INVESTMENT" color="#64748B" value={results.totalInvested} />
+          <ResultCard active={false} label="TARGET VALUE" color="#10B981" value={results.maturityValue} />
+        </>
+      )}
       {currentMenu === 'Tracker' && results && portfolio.length > 0 && (
         <>
           <ResultCard active label={viewingId ? "CURRENT VALUE (SELECTED)" : "TOTAL CURRENT VALUE"} color="#10B981" value={results.currentValue} />

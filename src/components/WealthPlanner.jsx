@@ -10,8 +10,8 @@ import ResultsSection from './ResultsSection';
 import CalculatorLayout from './CalculatorLayout';
 
 const Wealth = () => {
-  const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculateRealSIP, calculatePortfolio, getFundList, getFundNAV } = useFinance();
-  const [currentMenu, setCurrentMenu] = useState('SIP'); // 'SIP', 'RD', 'Loan'
+  const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculateRealSIP, calculatePortfolio, getFundList, getFundNAV, calculateGoalSIP } = useFinance();
+  const [currentMenu, setCurrentMenu] = useState('SIP');
   const [activeTab, setActiveTab] = useState('primary'); // For comparison views
   const [activeStrategy, setActiveStrategy] = useState('percent'); // For SIP Step-up
   const [loanPrepaymentStrategy, setLoanPrepaymentStrategy] = useState('yearly'); // For Loan Prepayment
@@ -21,7 +21,8 @@ const Wealth = () => {
     lumpsum: { amount: 100000, rate: 12, years: 10 },
     rd: { monthlyDeposit: 5000, rate: 7, quarters: 20 },
     loan: { principal: 1000000, rate: 8.5, months: 120, yearlyExtra: 0, monthlyExtra: 0 },
-    swp: { initialCorpus: 10000000, monthlyWithdrawal: 50000, annualRate: 8, stepUpPercent: 0 }
+    swp: { initialCorpus: 10000000, monthlyWithdrawal: 50000, annualRate: 8, stepUpPercent: 0 },
+    goal: { targetAmount: 10000000, rate: 12, years: 10 }
   });
 
   // --- Tracker State ---
@@ -308,6 +309,8 @@ const Wealth = () => {
       return calculateLumpsum(inputs.lumpsum.amount, inputs.lumpsum.rate, inputs.lumpsum.years);
     } else if (currentMenu === 'SWP') {
       return calculateSWP(inputs.swp.initialCorpus, inputs.swp.monthlyWithdrawal, inputs.swp.annualRate, inputs.swp.stepUpPercent);
+    } else if (currentMenu === 'Goal') {
+      return calculateGoalSIP(inputs.goal.targetAmount, inputs.goal.rate, inputs.goal.years);
     } else if (currentMenu === 'Loan') {
       return calculateLoan(
         inputs.loan.principal,
@@ -320,9 +323,7 @@ const Wealth = () => {
       return calculatePortfolio(portfolio);
     }
     return null;
-  }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, portfolio, calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculatePortfolio]);
-
-  // When portfolio is cleared, also clear viewingId
+  }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, portfolio, calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculatePortfolio, calculateGoalSIP]);
   useEffect(() => {
     if (portfolio.length === 0) setViewingId(null);
   }, [portfolio]);
@@ -395,6 +396,9 @@ const Wealth = () => {
       }
       data.unshift({ name: 'Start', 'Stepped-Up Withdrawal': inputs.swp.initialCorpus, 'Fixed Withdrawal': inputs.swp.initialCorpus });
       return data;
+    }
+    if (currentMenu === 'Goal' && results && results.breakdown) {
+      return results.breakdown;
     }
     if (currentMenu === 'Tracker' && results && results.breakdown) {
       return results.breakdown;
@@ -541,13 +545,15 @@ const Wealth = () => {
           </div>
 
           {/* Chart View */}
-          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
+          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || currentMenu === 'Goal' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
             <div className={`${styles.innerCard} ${styles.chartContainer}`}>
               <p className={styles.cardHeading}>
                 {currentMenu === 'SWP'
                   ? 'Corpus Depletion Over Time'
                   : currentMenu === 'Loan'
                   ? 'Loan Balance Over Time'
+                  : currentMenu === 'Goal'
+                  ? 'Wealth Projection'
                   : currentMenu === 'Tracker'
                   ? 'Portfolio Growth (Actual)'
                   : currentMenu === 'SIP'
@@ -577,6 +583,16 @@ const Wealth = () => {
                   secondaryColor="#64748B"
                   hideInvestedLine={true}
                 />
+              ) : currentMenu === 'Goal' ? (
+                <WealthChart
+                  data={chartData}
+                  primaryDataKey="TotalValue"
+                  primaryName="Projected Value"
+                  primaryColor="#10B981"
+                  secondaryDataKey="Invested"
+                  secondaryName="Invested Amount"
+                  secondaryColor="#64748B"
+                />
               ) : currentMenu === 'Tracker' ? (
                 <WealthChart
                   data={chartData}
@@ -600,13 +616,15 @@ const Wealth = () => {
           )}
 
           {/* Dynamic Breakdown Table */}
-          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
+          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || currentMenu === 'Goal' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
             <div className={styles.innerCard}>
               <p className={styles.cardHeading}>
                 {currentMenu === 'SWP'
                   ? 'Corpus Depletion Schedule'
                   : currentMenu === 'Loan'
                   ? 'Loan Repayment Schedule'
+                  : currentMenu === 'Goal'
+                  ? 'Investment Schedule'
                   : currentMenu === 'Tracker'
                   ? 'Transaction History'
                   : `${currentMenu} ${currentMenu === 'SIP' && (activeTab === 'primary' ? 'Step-Up' : 'Normal')} Breakdown Schedule`
@@ -651,6 +669,27 @@ const Wealth = () => {
                             <td className={styles.td}>₹{Number(row['Without Prepayment']).toLocaleString('en-IN')}</td>
                             <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
                               ₹{Number(row['With Prepayment']).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </>
+                  ) : currentMenu === 'Goal' ? (
+                    <>
+                      <thead>
+                        <tr>
+                          <th className={styles.th}>Year</th>
+                          <th className={styles.th}>Invested</th>
+                          <th className={styles.th}>Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chartData.map((row, index) => (
+                          <tr key={index}>
+                            <td className={styles.td}>{row.name.replace('Year ', '')}</td>
+                            <td className={styles.td}>₹{Number(row.Invested).toLocaleString('en-IN')}</td>
+                            <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
+                              ₹{Number(row.TotalValue).toLocaleString('en-IN')}
                             </td>
                           </tr>
                         ))}
