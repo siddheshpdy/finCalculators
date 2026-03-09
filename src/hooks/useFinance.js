@@ -334,8 +334,13 @@ export const useFinance = () => {
     if (!navData || navData.length === 0) return null;
 
     const { startDate, endDate, amount, lumpsum, stepUpPercent, stepUpValue } = inputs;
-    const start = new Date(startDate);
-    const sipEnd = endDate ? new Date(endDate) : null;
+    const [sy, sm, sd] = startDate.split('-').map(Number);
+    // Consistently parse dates as local time to avoid timezone issues
+    const start = new Date(sy, sm - 1, sd);
+    const sipEnd = endDate && endDate.length > 0 ? (() => {
+        const [ey, em, ed] = endDate.split('-').map(Number);
+        return new Date(ey, em - 1, ed);
+    })() : null;
     
     // Parse and sort NAV data (API returns newest first, we need oldest first)
     const sortedNav = navData.map(d => {
