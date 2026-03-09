@@ -5,10 +5,13 @@ import DualInput from './DualInput';
 import ResultCard from './ResultCard';
 import styles from './WealthPlanner.module.css';
 import CalculatorGuide from './CalculatorGuide';
+import InputSection from './InputSection';
+import ResultsSection from './ResultsSection';
+import CalculatorLayout from './CalculatorLayout';
 
 const Wealth = () => {
-  const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculateRealSIP, calculatePortfolio, getFundList, getFundNAV } = useFinance();
-  const [currentMenu, setCurrentMenu] = useState('SIP'); // 'SIP', 'RD', 'Loan'
+  const { calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculateRealSIP, calculatePortfolio, getFundList, getFundNAV, calculateGoalSIP } = useFinance();
+  const [currentMenu, setCurrentMenu] = useState('SIP');
   const [activeTab, setActiveTab] = useState('primary'); // For comparison views
   const [activeStrategy, setActiveStrategy] = useState('percent'); // For SIP Step-up
   const [loanPrepaymentStrategy, setLoanPrepaymentStrategy] = useState('yearly'); // For Loan Prepayment
@@ -18,7 +21,8 @@ const Wealth = () => {
     lumpsum: { amount: 100000, rate: 12, years: 10 },
     rd: { monthlyDeposit: 5000, rate: 7, quarters: 20 },
     loan: { principal: 1000000, rate: 8.5, months: 120, yearlyExtra: 0, monthlyExtra: 0 },
-    swp: { initialCorpus: 10000000, monthlyWithdrawal: 50000, annualRate: 8, stepUpPercent: 0 }
+    swp: { initialCorpus: 10000000, monthlyWithdrawal: 50000, annualRate: 8, stepUpPercent: 0 },
+    goal: { targetAmount: 10000000, rate: 12, years: 10 }
   });
 
   // --- Tracker State ---
@@ -39,6 +43,7 @@ const Wealth = () => {
   const [trackerLoading, setTrackerLoading] = useState(false);
   const [trackerInputs, setTrackerInputs] = useState({
     startDate: '2020-01-01',
+    endDate: '',
     amount: 5000,
     lumpsum: 0,
     stepUpPercent: 0,
@@ -46,7 +51,6 @@ const Wealth = () => {
   });
   
   const [viewingId, setViewingId] = useState(null);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [deleteConfirmationId, setDeleteConfirmationId] = useState(null);
   const [deletedItem, setDeletedItem] = useState(null);
   const [showToast, setShowToast] = useState(false);
@@ -54,7 +58,6 @@ const Wealth = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [investmentMode, setInvestmentMode] = useState('SIP'); // 'SIP', 'Lumpsum', 'Both'
   const fileInputRef = useRef(null);
-  const sidebarRef = useRef(null);
 
   useEffect(() => {
     setViewingId(null);
@@ -183,49 +186,6 @@ const Wealth = () => {
     setShowClearConfirmation(false);
   };
 
-  // Close mobile menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isMobileMenuOpen && sidebarRef.current && !sidebarRef.current.contains(event.target)) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isMobileMenuOpen]);
-
-  // Export to CSV
-  const downloadCSV = () => {
-    if (!portfolio || portfolio.length === 0) return;
-    
-    const headers = ['Scheme Code', 'Fund Name', 'Start Date', 'SIP Amount', 'Lumpsum', 'Total Invested', 'Current Value', 'Abs Return (%)', 'XIRR (%)'];
-    
-    const rows = portfolio.map(item => {
-      const stats = baseResults?.fundDetails?.find(f => f.id === item.id);
-      return [
-        item.fund.schemeCode,
-        `"${item.fund.schemeName.replace(/"/g, '""')}"`,
-        item.inputs.startDate,
-        item.inputs.amount,
-        item.inputs.lumpsum,
-        stats?.totalInvested || 0,
-        stats?.currentValue || 0,
-        stats?.absoluteReturn || 0,
-        stats?.xirr || 0
-      ];
-    });
-
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `portfolio_tracker_${new Date().toISOString().slice(0,10)}.csv`;
-    link.click();
-  };
-
   // Import CSV
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -254,6 +214,7 @@ const Wealth = () => {
         code: headers.findIndex(h => h.includes('code')),
         name: headers.findIndex(h => h.includes('name') || h.includes('fund')),
         date: headers.findIndex(h => h.includes('date') || h.includes('start')),
+        endDate: headers.findIndex(h => h.includes('end') && h.includes('date')),
         sip: headers.findIndex(h => h.includes('sip') || h.includes('amount')),
         lumpsum: headers.findIndex(h => h.includes('lumpsum'))
       };
@@ -268,6 +229,7 @@ const Wealth = () => {
         const schemeCode = colMap.code > -1 ? row[colMap.code] : null;
         const schemeName = colMap.name > -1 ? row[colMap.name] : null;
         const startDate = colMap.date > -1 ? row[colMap.date] : null;
+        const endDate = colMap.endDate > -1 ? row[colMap.endDate] : '';
         const sipAmount = colMap.sip > -1 ? parseFloat(row[colMap.sip]) || 0 : 0;
         const lumpsum = colMap.lumpsum > -1 ? parseFloat(row[colMap.lumpsum]) || 0 : 0;
 
@@ -287,7 +249,7 @@ const Wealth = () => {
             newItems.push({
               id: Date.now() + i,
               fund,
-              inputs: { startDate, amount: sipAmount, lumpsum, stepUpPercent: 0, stepUpValue: 0 },
+              inputs: { startDate, endDate, amount: sipAmount, lumpsum, stepUpPercent: 0, stepUpValue: 0 },
               navData
             });
           }
@@ -347,6 +309,8 @@ const Wealth = () => {
       return calculateLumpsum(inputs.lumpsum.amount, inputs.lumpsum.rate, inputs.lumpsum.years);
     } else if (currentMenu === 'SWP') {
       return calculateSWP(inputs.swp.initialCorpus, inputs.swp.monthlyWithdrawal, inputs.swp.annualRate, inputs.swp.stepUpPercent);
+    } else if (currentMenu === 'Goal') {
+      return calculateGoalSIP(inputs.goal.targetAmount, inputs.goal.rate, inputs.goal.years);
     } else if (currentMenu === 'Loan') {
       return calculateLoan(
         inputs.loan.principal,
@@ -359,9 +323,7 @@ const Wealth = () => {
       return calculatePortfolio(portfolio);
     }
     return null;
-  }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, portfolio, calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculatePortfolio]);
-
-  // When portfolio is cleared, also clear viewingId
+  }, [currentMenu, inputs, activeStrategy, loanPrepaymentStrategy, portfolio, calculateSIP, calculateRD, calculateLoan, calculateLumpsum, calculateSWP, calculatePortfolio, calculateGoalSIP]);
   useEffect(() => {
     if (portfolio.length === 0) setViewingId(null);
   }, [portfolio]);
@@ -378,50 +340,6 @@ const Wealth = () => {
     return baseResults;
   }, [baseResults, viewingId, currentMenu]);
   
-  // Sorting Logic
-  const sortedPortfolio = useMemo(() => {
-    let sortableItems = [...portfolio];
-    if (sortConfig.key !== null) {
-      sortableItems.sort((a, b) => {
-        const statsA = baseResults?.fundDetails?.find(f => f.id === a.id);
-        const statsB = baseResults?.fundDetails?.find(f => f.id === b.id);
-        
-        let aValue, bValue;
-        
-        if (sortConfig.key === 'fund') {
-            aValue = a.fund.schemeName.toLowerCase();
-            bValue = b.fund.schemeName.toLowerCase();
-        } else if (sortConfig.key === 'invested') {
-            aValue = parseFloat(statsA?.totalInvested || 0);
-            bValue = parseFloat(statsB?.totalInvested || 0);
-        } else if (sortConfig.key === 'value') {
-            aValue = parseFloat(statsA?.currentValue || 0);
-            bValue = parseFloat(statsB?.currentValue || 0);
-        } else if (sortConfig.key === 'xirr') {
-            aValue = parseFloat(statsA?.xirr || 0);
-            bValue = parseFloat(statsB?.xirr || 0);
-        }
-
-        if (aValue < bValue) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    return sortableItems;
-  }, [portfolio, sortConfig, baseResults]);
-
-  const requestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
   // 2. Chart Data Mapper
   const chartData = useMemo(() => {
     if (currentMenu === 'SIP') {
@@ -479,6 +397,9 @@ const Wealth = () => {
       data.unshift({ name: 'Start', 'Stepped-Up Withdrawal': inputs.swp.initialCorpus, 'Fixed Withdrawal': inputs.swp.initialCorpus });
       return data;
     }
+    if (currentMenu === 'Goal' && results && results.breakdown) {
+      return results.breakdown;
+    }
     if (currentMenu === 'Tracker' && results && results.breakdown) {
       return results.breakdown;
     }
@@ -490,268 +411,50 @@ const Wealth = () => {
   const showRightPane = currentMenu !== 'Tracker' || isAddingFund || portfolio.length === 0;
 
   return (
-    <div className={styles.wealthPlannerRoot}>
-      <div className={styles.mainContent}>
-        {/* Left Sidebar */}
-        <aside className={styles.sidebar} ref={sidebarRef}>
-          <div className={styles.sidebarHeader}>
-            <h2 className={styles.sidebarTitle}>Calculators</h2>
-            <button 
-              className={styles.mobileMenuToggle} 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              {isMobileMenuOpen ? '✕' : '☰'}
-            </button>
-          </div>
-          <div className={`${styles.sidebarMenu} ${isMobileMenuOpen ? styles.mobileMenuOpen : ''}`}>
-            {['SIP', 'Lumpsum', 'RD', 'Loan', 'SWP', 'Tracker'].map(m => (
-              <button key={m} onClick={() => { setCurrentMenu(m); setIsMobileMenuOpen(false); }} className={`${styles.sidebarBtn} ${currentMenu === m ? styles.sidebarBtnActive : ''}`}>{m}</button>
-            ))}
-            <button onClick={() => { setCurrentMenu('Help'); setIsMobileMenuOpen(false); }} className={`${styles.sidebarBtn} ${currentMenu === 'Help' ? styles.sidebarBtnActive : ''}`}>Help</button>
-          </div>
-        </aside>
-
-        <div className={styles.mainPanel}>
+    <CalculatorLayout
+      currentMenu={currentMenu}
+      setCurrentMenu={setCurrentMenu}
+      isMobileMenuOpen={isMobileMenuOpen}
+      setIsMobileMenuOpen={setIsMobileMenuOpen}
+    >
           {currentMenu === 'Help' ? (
             <CalculatorGuide />
           ) : (
           <>
           <div className={`${styles.controlGrid} ${!showMiddlePane ? (showRightPane ? styles.controlGridExpanded : styles.controlGridFull) : ''}`}>
             {/* Left: Input Section */}
-            <div className={styles.innerCard}>
-              <p className={styles.cardHeading}>{currentMenu} Details</p>
-              {currentMenu === 'SIP' && (
-                <>
-                  <DualInput label="Initial Lumpsum" symbol="₹" value={inputs.sip.initialLumpsum} min={0} max={1000000} step={5000}
-                    onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, initialLumpsum: v } })} />
-                  <DualInput label="Monthly SIP" symbol="₹" value={inputs.sip.amount} min={500} max={100000} step={500}
-                    onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, amount: v } })} />
-                  <DualInput label="Expected Return" symbol="%" value={inputs.sip.rate} min={1} max={30} step={0.5}
-                    onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, rate: v } })} />
-                  <DualInput label="Tenure" symbol="Yrs" value={inputs.sip.years} min={1} max={40} step={1}
-                    onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, years: v } })} />
-                  {/* <DualInput label="Assumed Inflation" symbol="%" value={inputs.sip.inflationRate} min={0} max={15} step={0.5}
-                    onChange={(v) => setInputs({ ...inputs, sip: { ...inputs.sip, inflationRate: v } })} /> */}
-                </>
-              )}
-              {/* Lumpsum Input View */}
-              {currentMenu === 'Lumpsum' && (
-                <>
-                  <DualInput label="Total Investment" symbol="₹" value={inputs.lumpsum.amount} min={5000} max={10000000} step={5000}
-                    onChange={(v) => setInputs({ ...inputs, lumpsum: { ...inputs.lumpsum, amount: v } })} />
-                  <DualInput label="Expected Return" symbol="%" value={inputs.lumpsum.rate} min={1} max={30} step={0.5}
-                    onChange={(v) => setInputs({ ...inputs, lumpsum: { ...inputs.lumpsum, rate: v } })} />
-                  <DualInput label="Tenure" symbol="Yrs" value={inputs.lumpsum.years} min={1} max={40} step={1}
-                    onChange={(v) => setInputs({ ...inputs, lumpsum: { ...inputs.lumpsum, years: v } })} />
-                </>
-              )}
-              {currentMenu === 'RD' && (
-                <>
-                  <DualInput label="Monthly Deposit" symbol="₹" value={inputs.rd.monthlyDeposit} min={500} max={100000} step={500}
-                    onChange={(v) => setInputs({ ...inputs, rd: { ...inputs.rd, monthlyDeposit: v } })} />
-                  <DualInput label="Interest Rate" symbol="%" value={inputs.rd.rate} min={1} max={15} step={0.1}
-                    onChange={(v) => setInputs({ ...inputs, rd: { ...inputs.rd, rate: v } })} />
-                  <DualInput label="Duration" symbol="Qtr" value={inputs.rd.quarters} min={1} max={80} step={1}
-                    onChange={(v) => setInputs({ ...inputs, rd: { ...inputs.rd, quarters: v } })} />
-                </>
-              )}
-              {currentMenu === 'Loan' && (
-                <>
-                  <DualInput label="Principal" symbol="₹" value={inputs.loan.principal} min={100000} max={10000000} step={50000}
-                    onChange={(v) => setInputs({ ...inputs, loan: { ...inputs.loan, principal: v } })} />
-                  <DualInput label="Interest Rate" symbol="%" value={inputs.loan.rate} min={5} max={20} step={0.1}
-                    onChange={(v) => setInputs({ ...inputs, loan: { ...inputs.loan, rate: v } })} />
-                  <DualInput label="Tenure" symbol="Mo" value={inputs.loan.months} min={12} max={360} step={12}
-                    onChange={(v) => setInputs({ ...inputs, loan: { ...inputs.loan, months: v } })} />
-                </>
-              )}
-              {currentMenu === 'SWP' && (
-                <>
-                  <DualInput label="Initial Corpus" symbol="₹" value={inputs.swp.initialCorpus} min={100000} max={50000000} step={100000}
-                    onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, initialCorpus: v } })} />
-                  <DualInput label="Monthly Withdrawal" symbol="₹" value={inputs.swp.monthlyWithdrawal} min={1000} max={200000} step={1000}
-                    onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, monthlyWithdrawal: v } })} />
-                  <DualInput label="Expected Return" symbol="%" value={inputs.swp.annualRate} min={1} max={20} step={0.5}
-                    onChange={(v) => setInputs({ ...inputs, swp: { ...inputs.swp, annualRate: v } })} />
-                </>
-              )}
-              {currentMenu === 'Tracker' && (
-                <>
-                  {!isAddingFund && portfolio.length > 0 ? (
-                    <>
-                      {viewingId && (
-                        <button onClick={() => setViewingId(null)} className={styles.viewAllBtn}>
-                          ← Back to Full Portfolio
-                        </button>
-                      )}
-                      <div className={styles.trackerTableContainer}>
-                        <table className={styles.trackerTable}>
-                          <thead>
-                            <tr>
-                              <th onClick={() => requestSort('fund')} style={{cursor: 'pointer'}}>
-                                Fund {sortConfig.key === 'fund' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                              </th>
-                              <th onClick={() => requestSort('invested')} style={{cursor: 'pointer'}}>
-                                Invested {sortConfig.key === 'invested' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                              </th>
-                              <th onClick={() => requestSort('value')} style={{cursor: 'pointer'}}>
-                                Value {sortConfig.key === 'value' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                              </th>
-                              <th onClick={() => requestSort('xirr')} style={{cursor: 'pointer'}}>
-                                XIRR {sortConfig.key === 'xirr' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                              </th>
-                              <th></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sortedPortfolio.map(item => {
-                              const stats = baseResults?.fundDetails?.find(f => f.id === item.id);
-                              return (
-                                <tr key={item.id} 
-                                    className={`${styles.trackerRow} ${viewingId === item.id ? styles.trackerRowSelected : ''}`}
-                                    onClick={() => setViewingId(item.id)}
-                                >
-                                  <td>
-                                    <span className={styles.fundName} title={item.fund.schemeName}>{item.fund.schemeName}</span>
-                                    <span className={styles.fundMeta}>
-                                      {item.inputs.amount > 0 && `SIP: ₹${Number(item.inputs.amount).toLocaleString('en-IN')} | `}
-                                      {item.inputs.lumpsum > 0 && `Lumpsum: ₹${Number(item.inputs.lumpsum).toLocaleString('en-IN')} | `}
-                                      Start: {item.inputs.startDate}
-                                    </span>
-                                  </td>
-                                  <td data-label="Invested" style={{color: '#64748B'}}>
-                                    ₹{Number(stats?.totalInvested || 0).toLocaleString('en-IN')}
-                                  </td>
-                                  <td data-label="Value">
-                                    <div style={{fontWeight: 'bold'}}>₹{Number(stats?.currentValue || 0).toLocaleString('en-IN')}</div>
-                                    <div style={{fontSize: '10px', color: (stats?.absoluteReturn || 0) >= 0 ? '#10B981' : '#EF4444'}}>{stats?.absoluteReturn}%</div>
-                                  </td>
-                                  <td data-label="XIRR" style={{fontWeight: '600', color: (stats?.xirr || 0) >= 0 ? '#10B981' : '#EF4444'}}>{stats?.xirr}%</td>
-                                  <td onClick={(e) => e.stopPropagation()}>
-                                    <button onClick={() => handleEditFund(item)} className={styles.iconBtn} title="Edit">✎</button>
-                                    <button onClick={() => handleRemoveFund(item.id)} className={styles.iconBtn} style={{color: '#EF4444'}} title="Remove">×</button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                          <tfoot>
-                            <tr className={styles.trackerFooter}>
-                              <td>Total</td>
-                              <td data-label="Total Invested">₹{Number(baseResults?.totalInvested || 0).toLocaleString('en-IN')}</td>
-                              <td data-label="Total Value">
-                                <div>₹{Number(baseResults?.currentValue || 0).toLocaleString('en-IN')}</div>
-                                <div style={{fontSize: '10px', color: (baseResults?.absoluteReturn || 0) >= 0 ? '#10B981' : '#EF4444'}}>
-                                  {baseResults?.absoluteReturn}%
-                                </div>
-                              </td>
-                              <td data-label="Total XIRR" style={{color: (baseResults?.xirr || 0) >= 0 ? '#10B981' : '#EF4444'}}>
-                                {baseResults?.xirr}%
-                              </td>
-                              <td></td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                      <div className={styles.trackerActionRow}>
-                        <button onClick={() => { 
-                          setIsAddingFund(true); 
-                          setEditingId(null); 
-                          setSelectedFund(null); 
-                          setNavData([]); 
-                          setSearchQuery('');
-                          setTrackerInputs({ startDate: '2020-01-01', amount: 5000, lumpsum: 0, stepUpPercent: 0, stepUpValue: 0 });
-                          setInvestmentMode('SIP');
-                        }} className={styles.addFundBtn}>+ Add Fund</button>
-                        <button onClick={downloadCSV} className={styles.exportBtn}>Export CSV</button>
-                        <button onClick={handleImportClick} className={styles.importBtn}>Import CSV</button>
-                        <button onClick={() => setShowClearConfirmation(true)} className={styles.clearBtn}>Clear Portfolio</button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                    {!selectedFund ? (
-                    <>
-                    <div className={styles.searchContainer}>
-                      <div className={styles.searchHeader}>
-                        <label className={styles.label}>Search Mutual Fund</label>
-                        <button onClick={handleRefreshFunds} className={styles.refreshBtn} title="Force Refresh List">↻</button>
-                      </div>
-                      <input 
-                        type="text" 
-                        list="fund-suggestions"
-                        placeholder="Start typing fund name..." 
-                        value={searchQuery}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSearchQuery(val);
-                          const match = fundList.find(f => f.schemeName === val);
-                          if (match) handleFundSelect(match);
-                        }}
-                        className={styles.searchInput}
-                      />
-                      <datalist id="fund-suggestions">
-                        {searchQuery.length > 1 && fundList
-                          .filter(f => f.schemeName.toLowerCase().includes(searchQuery.toLowerCase()))
-                          .slice(0, 50)
-                          .map(f => (
-                            <option key={f.schemeCode} value={f.schemeName} />
-                          ))
-                        }
-                      </datalist>
-                      {trackerLoading && <p className={styles.loadingText}>Loading funds...</p>}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', margin: '10px 0 20px 0' }}>
-                      <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
-                      <span style={{ padding: '0 10px', color: '#94A3B8', fontSize: '12px', fontWeight: '600' }}>OR</span>
-                      <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }}></div>
-                    </div>
-                    <button onClick={handleImportClick} className={styles.importBtn} style={{ width: '100%', marginBottom: '20px' }}>
-                      Import Portfolio from CSV
-                    </button>
-                    </>
-                  ) : (
-                    <div className={styles.selectedFundBox}>
-                      <strong>{selectedFund.schemeName}</strong>
-                      <button onClick={() => { setSelectedFund(null); setNavData([]); }} className={styles.changeBtn}>Change</button>
-                      {trackerLoading && <div className={styles.fetchingText}>Fetching historical NAV data...</div>}
-                    </div>
-                  )}
-                  
-                  <div className={styles.inputGroup}>
-                    <label className={styles.label}>Start Date</label>
-                    <input type="date" value={trackerInputs.startDate} onChange={(e) => setTrackerInputs({...trackerInputs, startDate: e.target.value})} className={styles.dateInput} />
-                  </div>
-
-                  <div className={styles.inputGroup}>
-                    <label className={styles.label}>Investment Type</label>
-                    <div className={styles.toggleWrapper} style={{ width: '100%', boxSizing: 'border-box', display: 'flex' }}>
-                      <button onClick={() => { setInvestmentMode('SIP'); setTrackerInputs(p => ({...p, lumpsum: 0, amount: p.amount || 5000})); }} className={`${styles.toggleBtn} ${investmentMode === 'SIP' ? styles.toggleBtnActive : ''}`} style={{flex: 1}}>SIP</button>
-                      <button onClick={() => { setInvestmentMode('Lumpsum'); setTrackerInputs(p => ({...p, amount: 0, lumpsum: p.lumpsum || 50000})); }} className={`${styles.toggleBtn} ${investmentMode === 'Lumpsum' ? styles.toggleBtnActive : ''}`} style={{flex: 1}}>Lumpsum</button>
-                      <button onClick={() => { setInvestmentMode('Both'); setTrackerInputs(p => ({...p, amount: p.amount || 5000, lumpsum: p.lumpsum || 50000})); }} className={`${styles.toggleBtn} ${investmentMode === 'Both' ? styles.toggleBtnActive : ''}`} style={{flex: 1}}>Both</button>
-                    </div>
-                  </div>
-
-                  {(investmentMode === 'SIP' || investmentMode === 'Both') && (
-                    <DualInput label="Monthly SIP" symbol="₹" value={trackerInputs.amount} min={0} max={100000} step={500}
-                      onChange={(v) => setTrackerInputs({ ...trackerInputs, amount: v })} />
-                  )}
-                  
-                  {(investmentMode === 'Lumpsum' || investmentMode === 'Both') && (
-                    <DualInput label="Initial Lumpsum" symbol="₹" value={trackerInputs.lumpsum} min={0} max={1000000} step={5000}
-                      onChange={(v) => setTrackerInputs({ ...trackerInputs, lumpsum: v })} />
-                  )}
-
-                  <button onClick={handleAddToPortfolio} disabled={!selectedFund || trackerLoading} className={styles.addFundBtn} style={{ marginTop: '20px' }}>
-                    {trackerLoading ? 'Loading...' : (editingId ? 'Update Portfolio' : 'Add to Portfolio')}
-                  </button>
-                  {portfolio.length > 0 && <button onClick={() => { setIsAddingFund(false); setEditingId(null); setSelectedFund(null); setNavData([]); setSearchQuery(''); }} className={styles.cancelBtn}>Cancel</button>}
-                  </>
-                  )}
-                </>
-              )}
-            </div>
+            <InputSection
+              currentMenu={currentMenu}
+              inputs={inputs}
+              setInputs={setInputs}
+              portfolio={portfolio}
+              isAddingFund={isAddingFund}
+              setIsAddingFund={setIsAddingFund}
+              editingId={editingId}
+              setEditingId={setEditingId}
+              trackerInputs={trackerInputs}
+              setTrackerInputs={setTrackerInputs}
+              investmentMode={investmentMode}
+              setInvestmentMode={setInvestmentMode}
+              fundList={fundList}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              selectedFund={selectedFund}
+              setSelectedFund={setSelectedFund}
+              navData={navData}
+              setNavData={setNavData}
+              trackerLoading={trackerLoading}
+              handleRefreshFunds={handleRefreshFunds}
+              handleFundSelect={handleFundSelect}
+              handleImportClick={handleImportClick}
+              handleAddToPortfolio={handleAddToPortfolio}
+              baseResults={baseResults}
+              viewingId={viewingId}
+              setViewingId={setViewingId}
+              handleEditFund={handleEditFund}
+              handleRemoveFund={handleRemoveFund}
+              setShowClearConfirmation={setShowClearConfirmation}
+            />
 
             {/* Middle: Strategy/Extra Options */}
             {showMiddlePane && (
@@ -829,80 +532,28 @@ const Wealth = () => {
 
             {/* Right: Maturity Results */}
             {showRightPane && (
-            <div className={styles.resultsColumn}>
-              {currentMenu === 'SIP' && (
-                <>
-                  <ResultCard active={activeTab === 'primary'} label="STEP-UP MATURITY" color="#10B981" value={results.summary.stepUpSip.totalValue} onClick={() => setActiveTab('primary')} />
-                  <ResultCard active={activeTab === 'secondary'} label="NORMAL MATURITY" color="#3B82F6" value={results.summary.normalSip.totalValue} onClick={() => setActiveTab('secondary')} />
-                  {/* <ResultCard
-                    active={false}
-                    label="MATURITY IN TODAY'S VALUE"
-                    color="#F59E0B"
-                    value={activeTab === 'primary' ? results.summary.stepUpSip.inflationAdjustedValue : results.summary.normalSip.inflationAdjustedValue}
-                  /> */}
-                </>
-              )}
-              {/* Lumpsum Result Cards */}
-              {currentMenu === 'Lumpsum' && (
-                <>
-                  <ResultCard active label="MATURITY VALUE" color="#10B981" value={results.maturityValue} />
-                  <ResultCard active={false} label="TOTAL INVESTED" color="#64748B" value={results.totalInvested} />
-                </>
-              )}
-              {currentMenu === 'RD' && (
-                <>
-                  <ResultCard active label="MATURITY VALUE" color="#10B981" value={results.maturityValue} />
-                  <ResultCard active={false} label="INTEREST EARNED" color="#64748B" value={results.interestEarned} />
-                </>
-              )}
-              {currentMenu === 'Loan' && (
-                <>
-                  <ResultCard active label="MONTHLY EMI" color="#EF4444" value={results.monthlyPayment} />
-                  <ResultCard active={false} label="TOTAL INTEREST" color="#64748B" value={results.totalInterest} />
-                  {(inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0) && (
-                    <ResultCard active={false} label="INTEREST SAVED" color="#10B981" value={results.interestSaved} />
-                  )}
-                  {/* NEW: Total Amount Paid */}
-                  <div className={styles.totalPaidCard}>
-                    <p className={styles.labelSmall}>TOTAL AMOUNT PAID</p>
-                    <h3 className={styles.valueLarge}>
-                      ₹{Number(results.totalAmountPaid).toLocaleString('en-IN')}
-                    </h3>
-                    {results.monthsSaved > 0 && (
-                      <span className={styles.savedMonths}>
-                        ✓ Saved {results.monthsSaved} months
-                      </span>
-                    )}
-                  </div>
-                </>
-              )}
-              {currentMenu === 'SWP' && results && (
-                <>
-                  <ResultCard active label="Corpus Lasts For" color="#3B82F6" value={`${Math.floor(results.monthsLasted / 12)}Y ${results.monthsLasted % 12}M`} />
-                  <ResultCard active={false} label="Total Withdrawn" color="#10B981" value={results.totalWithdrawn} />
-                  <ResultCard active={false} label="Final Balance" color="#64748B" value={results.finalBalance} />
-                </>
-              )}
-              {currentMenu === 'Tracker' && results && portfolio.length > 0 && (
-                <>
-                  <ResultCard active label={viewingId ? "CURRENT VALUE (SELECTED)" : "TOTAL CURRENT VALUE"} color="#10B981" value={results.currentValue} />
-                  <ResultCard active={false} label="TOTAL INVESTED" color="#64748B" value={results.totalInvested} />
-                  <ResultCard active={false} label="ABS RETURNS" color={results.absoluteReturn >= 0 ? "#10B981" : "#EF4444"} value={`${results.absoluteReturn}%`} />
-                  <ResultCard active={false} label="XIRR" color={results.xirr >= 0 ? "#10B981" : "#EF4444"} value={`${results.xirr}%`} />
-                </>
-              )}
-            </div>
+              <ResultsSection
+                currentMenu={currentMenu}
+                results={results}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                inputs={inputs}
+                viewingId={viewingId}
+                portfolio={portfolio}
+              />
             )}
           </div>
 
           {/* Chart View */}
-          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
+          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || currentMenu === 'Goal' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
             <div className={`${styles.innerCard} ${styles.chartContainer}`}>
               <p className={styles.cardHeading}>
                 {currentMenu === 'SWP'
                   ? 'Corpus Depletion Over Time'
                   : currentMenu === 'Loan'
                   ? 'Loan Balance Over Time'
+                  : currentMenu === 'Goal'
+                  ? 'Wealth Projection'
                   : currentMenu === 'Tracker'
                   ? 'Portfolio Growth (Actual)'
                   : currentMenu === 'SIP'
@@ -932,6 +583,16 @@ const Wealth = () => {
                   secondaryColor="#64748B"
                   hideInvestedLine={true}
                 />
+              ) : currentMenu === 'Goal' ? (
+                <WealthChart
+                  data={chartData}
+                  primaryDataKey="TotalValue"
+                  primaryName="Projected Value"
+                  primaryColor="#10B981"
+                  secondaryDataKey="Invested"
+                  secondaryName="Invested Amount"
+                  secondaryColor="#64748B"
+                />
               ) : currentMenu === 'Tracker' ? (
                 <WealthChart
                   data={chartData}
@@ -955,13 +616,15 @@ const Wealth = () => {
           )}
 
           {/* Dynamic Breakdown Table */}
-          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
+          {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || currentMenu === 'Goal' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
             <div className={styles.innerCard}>
               <p className={styles.cardHeading}>
                 {currentMenu === 'SWP'
                   ? 'Corpus Depletion Schedule'
                   : currentMenu === 'Loan'
                   ? 'Loan Repayment Schedule'
+                  : currentMenu === 'Goal'
+                  ? 'Investment Schedule'
                   : currentMenu === 'Tracker'
                   ? 'Transaction History'
                   : `${currentMenu} ${currentMenu === 'SIP' && (activeTab === 'primary' ? 'Step-Up' : 'Normal')} Breakdown Schedule`
@@ -1011,22 +674,19 @@ const Wealth = () => {
                         ))}
                       </tbody>
                     </>
-                  ) : currentMenu === 'Tracker' && portfolio.length > 0 ? (
+                  ) : currentMenu === 'Goal' ? (
                     <>
                       <thead>
                         <tr>
-                          <th className={styles.th}>Date</th>
-                          <th className={styles.th}>NAV</th>
+                          <th className={styles.th}>Year</th>
                           <th className={styles.th}>Invested</th>
                           <th className={styles.th}>Value</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {/* Show reversed for table (newest first) */}
-                        {[...chartData].reverse().map((row, index) => (
+                        {chartData.map((row, index) => (
                           <tr key={index}>
-                            <td className={styles.td}>{row.name}</td>
-                            <td className={styles.td}>{row.NAV}</td>
+                            <td className={styles.td}>{row.name.replace('Year ', '')}</td>
                             <td className={styles.td}>₹{Number(row.Invested).toLocaleString('en-IN')}</td>
                             <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
                               ₹{Number(row.TotalValue).toLocaleString('en-IN')}
@@ -1034,6 +694,54 @@ const Wealth = () => {
                           </tr>
                         ))}
                       </tbody>
+                    </>
+                  ) : currentMenu === 'Tracker' && portfolio.length > 0 ? (
+                    <>
+                      {viewingId ? (
+                        <>
+                          <thead>
+                            <tr>
+                              <th className={styles.th}>Date</th>
+                              <th className={styles.th}>NAV</th>
+                              <th className={styles.th}>Amount</th>
+                              <th className={styles.th}>Units</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...(results.purchaseHistory || [])].reverse().map((row, index) => (
+                              <tr key={index}>
+                                <td className={styles.td}>{row.dateStr}</td>
+                                <td className={styles.td}>{row.nav.toFixed(2)}</td>
+                                <td className={styles.td}>₹{Number(row.amount).toLocaleString('en-IN')}</td>
+                                <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
+                                  {row.units.toFixed(3)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </>
+                      ) : (
+                        <>
+                          <thead>
+                            <tr>
+                              <th className={styles.th}>Date</th>
+                              <th className={styles.th}>Total Invested</th>
+                              <th className={styles.th}>Total Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...(results.breakdown || [])].reverse().map((row, index) => (
+                              <tr key={index}>
+                                <td className={styles.td}>{row.name}</td>
+                                <td className={styles.td}>₹{Number(row.Invested).toLocaleString('en-IN')}</td>
+                                <td className={`${styles.td} ${styles.tdMaturity} ${styles.textGreen}`}>
+                                  ₹{Number(row.TotalValue).toLocaleString('en-IN')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
@@ -1089,7 +797,6 @@ const Wealth = () => {
           )}
           </>
           )}
-        </div>
 
         {/* Confirmation Modal */}
         {deleteConfirmationId && (
@@ -1135,8 +842,7 @@ const Wealth = () => {
           accept=".csv" 
           onChange={handleFileChange} 
         />
-      </div>
-    </div>
+    </CalculatorLayout>
   );
 };
 
