@@ -9,7 +9,7 @@ The `WealthPlanner.jsx` file currently acts as a "God Component," handling routi
 - [ ] **Recommendation**: Split the component into smaller, focused sub-components.
     - [ ] `CalculatorLayout.jsx`: Handles the sidebar and main grid layout.
     - [x] `InputSection.jsx`: Renders the `DualInput` fields based on the active calculator configuration.
-    - [ ] `ResultsSection.jsx`: Renders the `ResultCard` grid.
+    - [x] `ResultsSection.jsx`: Renders the `ResultCard` grid.
     - [x] `PortfolioTracker.jsx`: Isolate the entire "Tracker" logic (search, table, import/export) into its own component.
 
 ### B. TypeScript Migration
