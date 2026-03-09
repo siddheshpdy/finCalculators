@@ -8,9 +8,9 @@ Based on the repository analysis, the following enhancements are recommended to 
 The `WealthPlanner.jsx` file currently acts as a "God Component," handling routing, state, UI layout, and logic for five different calculators plus a portfolio tracker.
 - [ ] **Recommendation**: Split the component into smaller, focused sub-components.
     - [ ] `CalculatorLayout.jsx`: Handles the sidebar and main grid layout.
-    - [ ] `InputSection.jsx`: Renders the `DualInput` fields based on the active calculator configuration.
+    - [x] `InputSection.jsx`: Renders the `DualInput` fields based on the active calculator configuration.
     - [ ] `ResultsSection.jsx`: Renders the `ResultCard` grid.
-    - [ ] `PortfolioTracker.jsx`: Isolate the entire "Tracker" logic (search, table, import/export) into its own component.
+    - [x] `PortfolioTracker.jsx`: Isolate the entire "Tracker" logic (search, table, import/export) into its own component.
 
 ### B. TypeScript Migration
 Financial applications rely heavily on precise data structures and number handling.
