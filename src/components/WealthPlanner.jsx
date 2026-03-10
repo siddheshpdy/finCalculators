@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useFinance } from '../hooks/useFinance';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import autoTable from 'jspdf-autotable';
 import WealthChart from './WealthChart';
 import DualInput from './DualInput';
 import ResultCard from './ResultCard';
@@ -203,8 +204,8 @@ const Wealth = () => {
 
     const addElementToPdf = async (element) => {
       if (!element) return;
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
+      const canvas = await html2canvas(element, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/jpeg', 0.70);
       const imgProps = pdf.getImageProperties(imgData);
       const imgHeight = (imgProps.height * (pdfWidth - 30)) / imgProps.width;
 
@@ -212,7 +213,7 @@ const Wealth = () => {
         pdf.addPage();
         currentY = 15;
       }
-      pdf.addImage(imgData, 'PNG', 15, currentY, pdfWidth - 30, imgHeight);
+      pdf.addImage(imgData, 'JPEG', 15, currentY, pdfWidth - 30, imgHeight);
       currentY += imgHeight + 10;
     };
 
@@ -220,12 +221,109 @@ const Wealth = () => {
     pdf.text(`${currentMenu} Financial Plan`, pdfWidth / 2, currentY, { align: 'center' });
     currentY += 20;
 
+    if (currentMenu === 'Tracker' && results) {
+      pdf.setFontSize(12);
+      pdf.setTextColor(60);
+      const margin = 20;
+      const col2 = pdfWidth / 2;
+
+      pdf.text(`Current Value: Rs. ${Number(results.currentValue).toLocaleString('en-IN')}`, margin, currentY);
+      pdf.text(`Invested: Rs. ${Number(results.totalInvested).toLocaleString('en-IN')}`, col2, currentY);
+      currentY += 15;
+
+      pdf.text(`XIRR: ${results.xirr}%`, margin, currentY);
+      pdf.text(`Abs Return: ${results.absoluteReturn}%`, col2, currentY);
+      currentY += 15;
+
+      const pnl = Number(results.currentValue) - Number(results.totalInvested);
+      pdf.text(`P&L: Rs. ${pnl.toLocaleString('en-IN')}`, margin, currentY);
+      currentY += 25;
+      pdf.setTextColor(0);
+    }
+
     await new Promise(resolve => setTimeout(resolve, 100));
 
     await addElementToPdf(resultsRef.current);
     await addElementToPdf(chartRef.current);
-    await addElementToPdf(tableRef.current);
+    
+    // Table Generation using autoTable
+    let head = [];
+    let body = [];
+    const formatCurrency = (val) => `Rs. ${Number(val).toLocaleString('en-IN')}`;
 
+    if (currentMenu === 'SIP' && results?.breakdown) {
+      head = [['Year', 'Monthly SIP', 'Invested', 'Maturity Value']];
+      body = results.breakdown.map(row => {
+        const data = activeTab === 'primary' ? row.stepUp : row.normal;
+        return [
+          row.year,
+          formatCurrency(activeTab === 'primary' ? data.monthlyInstallment : inputs.sip.amount),
+          formatCurrency(data.investedAmount),
+          formatCurrency(data.totalValue)
+        ];
+      });
+    } else if (currentMenu === 'RD' && results?.breakdown) {
+      head = [['Quarter', 'Monthly Deposit', 'Invested', 'Maturity Value']];
+      body = results.breakdown.map(row => [
+        row.name,
+        formatCurrency(inputs.rd.monthlyDeposit),
+        formatCurrency(row.Invested),
+        formatCurrency(row.TotalValue)
+      ]);
+    } else if (currentMenu === 'Loan' && chartData.length > 0) {
+      head = [['Year', 'Balance (w/o Prepayment)', 'Balance (w/ Prepayment)']];
+      body = chartData.filter(d => d.name !== 'Start').map(row => [
+        row.name.replace('Yr ', ''),
+        formatCurrency(row['Without Prepayment']),
+        formatCurrency(row['With Prepayment'])
+      ]);
+    } else if (currentMenu === 'SWP' && chartData.length > 0) {
+      const hasStepUp = inputs.swp.stepUpPercent > 0;
+      head = [['Year', hasStepUp ? 'Corpus (Fixed)' : '', `Corpus (${hasStepUp ? 'Stepped-Up' : 'Fixed'})`].filter(Boolean)];
+      body = chartData.filter(d => d.name !== 'Start').map(row => {
+        const rowData = [row.name.replace(/Year |Yr /g, '')];
+        if (hasStepUp) rowData.push(formatCurrency(row['Fixed Withdrawal']));
+        rowData.push(formatCurrency(row['Stepped-Up Withdrawal'] ?? row['Fixed Withdrawal']));
+        return rowData;
+      });
+    } else if (currentMenu === 'Goal' && chartData.length > 0) {
+      head = [['Year', 'Invested', 'Value']];
+      body = chartData.map(row => [
+        row.name.replace('Year ', ''),
+        formatCurrency(row.Invested),
+        formatCurrency(row.TotalValue)
+      ]);
+    } else if (currentMenu === 'Tracker' && portfolio.length > 0) {
+      if (viewingId && results?.purchaseHistory) {
+        head = [['Date', 'NAV', 'Amount', 'Units']];
+        body = [...results.purchaseHistory].reverse().map(row => [
+          row.dateStr,
+          row.nav.toFixed(2),
+          formatCurrency(row.amount),
+          row.units.toFixed(3)
+        ]);
+      } else if (results?.breakdown) {
+        head = [['Date', 'Total Invested', 'Total Value']];
+        body = [...results.breakdown].reverse().map(row => [
+          row.name,
+          formatCurrency(row.Invested),
+          formatCurrency(row.TotalValue)
+        ]);
+      }
+    }
+
+    if (head.length > 0) {
+      autoTable(pdf, {
+        startY: currentY + 10,
+        head: head,
+        body: body,
+        theme: 'striped',
+        headStyles: { fillColor: [30, 41, 59] },
+        styles: { fontSize: 10, cellPadding: 3 },
+        margin: { left: 15, right: 15 }
+      });
+    }
+    
     pdf.save(`financial-plan-${currentMenu.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
