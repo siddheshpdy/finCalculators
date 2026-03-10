@@ -2,7 +2,7 @@ import React from 'react';
 import ResultCard from './ResultCard';
 import styles from './WealthPlanner.module.css';
 
-const ResultsSection = ({
+const ResultsSection = React.forwardRef(({
   currentMenu,
   results,
   activeTab,
@@ -10,13 +10,13 @@ const ResultsSection = ({
   inputs,
   viewingId,
   portfolio,
-}) => {
+}, ref) => {
   if (!results) {
     return null;
   }
 
   return (
-    <div className={styles.resultsColumn}>
+    <div className={styles.resultsColumn} ref={ref}>
       {currentMenu === 'SIP' && (
         <>
           <ResultCard active={activeTab === 'primary'} label="STEP-UP MATURITY" color="#10B981" value={results.summary.stepUpSip.totalValue} onClick={() => setActiveTab('primary')} />
@@ -87,6 +87,6 @@ const ResultsSection = ({
       )}
     </div>
   );
-};
+});
 
 export default ResultsSection;

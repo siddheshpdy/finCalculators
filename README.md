@@ -128,6 +128,7 @@ Projects the lifespan of an investment corpus while making regular withdrawals.
 *   **Frontend Framework**: React.js
 *   **State Management**: React Hooks (`useState`, `useMemo`) for efficient data handling.
 *   **Visualization**: Recharts for responsive, interactive graphs.
+*   **PDF Export**: `jspdf` and `html2canvas` for generating downloadable reports.
 *   **Styling**: CSS Modules for scoped, maintainable styles.
 *   **Responsive Design**: Mobile-first approach ensuring usability on all devices.
 

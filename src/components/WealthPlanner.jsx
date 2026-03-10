@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useFinance } from '../hooks/useFinance';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import WealthChart from './WealthChart';
 import DualInput from './DualInput';
 import ResultCard from './ResultCard';
@@ -58,6 +60,9 @@ const Wealth = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [investmentMode, setInvestmentMode] = useState('SIP'); // 'SIP', 'Lumpsum', 'Both'
   const fileInputRef = useRef(null);
+  const resultsRef = useRef(null);
+  const chartRef = useRef(null);
+  const tableRef = useRef(null);
 
   useEffect(() => {
     setViewingId(null);
@@ -184,6 +189,44 @@ const Wealth = () => {
   const handleClearPortfolio = () => {
     setPortfolio([]);
     setShowClearConfirmation(false);
+  };
+
+  const handleDownloadPdf = async () => {
+    // Handle potential import differences (default vs named) depending on build environment
+    const pdf = new (jsPDF.jsPDF || jsPDF)({
+      orientation: 'portrait',
+      unit: 'px',
+      format: 'a4',
+    });
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    let currentY = 15;
+
+    const addElementToPdf = async (element) => {
+      if (!element) return;
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgHeight = (imgProps.height * (pdfWidth - 30)) / imgProps.width;
+
+      if (currentY + imgHeight > pdf.internal.pageSize.getHeight()) {
+        pdf.addPage();
+        currentY = 15;
+      }
+      pdf.addImage(imgData, 'PNG', 15, currentY, pdfWidth - 30, imgHeight);
+      currentY += imgHeight + 10;
+    };
+
+    pdf.setFontSize(20);
+    pdf.text(`${currentMenu} Financial Plan`, pdfWidth / 2, currentY, { align: 'center' });
+    currentY += 20;
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    await addElementToPdf(resultsRef.current);
+    await addElementToPdf(chartRef.current);
+    await addElementToPdf(tableRef.current);
+
+    pdf.save(`financial-plan-${currentMenu.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   // Import CSV
@@ -533,6 +576,7 @@ const Wealth = () => {
             {/* Right: Maturity Results */}
             {showRightPane && (
               <ResultsSection
+                ref={resultsRef}
                 currentMenu={currentMenu}
                 results={results}
                 activeTab={activeTab}
@@ -546,21 +590,24 @@ const Wealth = () => {
 
           {/* Chart View */}
           {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || currentMenu === 'Goal' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
-            <div className={`${styles.innerCard} ${styles.chartContainer}`}>
-              <p className={styles.cardHeading}>
-                {currentMenu === 'SWP'
-                  ? 'Corpus Depletion Over Time'
-                  : currentMenu === 'Loan'
-                  ? 'Loan Balance Over Time'
-                  : currentMenu === 'Goal'
-                  ? 'Wealth Projection'
-                  : currentMenu === 'Tracker'
-                  ? 'Portfolio Growth (Actual)'
-                  : currentMenu === 'SIP'
-                    ? (activeTab === 'primary' ? 'Step-Up' : 'Normal') + ' Wealth Projection'
-                    : 'RD Wealth Projection'
-                }
-              </p>
+            <div className={`${styles.innerCard} ${styles.chartContainer}`} ref={chartRef}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p className={styles.cardHeading}>
+                  {currentMenu === 'SWP'
+                    ? 'Corpus Depletion Over Time'
+                    : currentMenu === 'Loan'
+                    ? 'Loan Balance Over Time'
+                    : currentMenu === 'Goal'
+                    ? 'Wealth Projection'
+                    : currentMenu === 'Tracker'
+                    ? 'Portfolio Growth (Actual)'
+                    : currentMenu === 'SIP'
+                      ? (activeTab === 'primary' ? 'Step-Up' : 'Normal') + ' Wealth Projection'
+                      : 'RD Wealth Projection'
+                  }
+                </p>
+                <button onClick={handleDownloadPdf} className={styles.exportBtn}>Export PDF</button>
+              </div>
               {currentMenu === 'Loan' ? (
                 <WealthChart
                   data={chartData}
@@ -617,7 +664,7 @@ const Wealth = () => {
 
           {/* Dynamic Breakdown Table */}
           {(currentMenu === 'SIP' || currentMenu === 'RD' || currentMenu === 'SWP' || currentMenu === 'Goal' || (currentMenu === 'Tracker' && portfolio.length > 0) || (currentMenu === 'Loan' && (inputs.loan.yearlyExtra > 0 || inputs.loan.monthlyExtra > 0))) && (
-            <div className={styles.innerCard}>
+            <div className={styles.innerCard} ref={tableRef}>
               <p className={styles.cardHeading}>
                 {currentMenu === 'SWP'
                   ? 'Corpus Depletion Schedule'

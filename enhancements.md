@@ -31,7 +31,7 @@ Users often know *what* they want (e.g., ₹1 Crore in 10 years) but not *how* t
 - [x] **Recommendation**: Add a "Goal Planner" mode. Given `Target Amount`, `Tenure`, and `Rate`, calculate the required `Monthly SIP`.
 
 ### C. PDF Export
-- [ ] **Recommendation**: Allow users to download a PDF report of their financial plan, including the chart and the breakdown table, using libraries like `jspdf` or `html2canvas`.
+- [x] **Recommendation**: Allow users to download a PDF report of their financial plan, including the chart and the breakdown table, using libraries like `jspdf` or `html2canvas`.
 
 ### D. Inflation Toggle
 The SIP calculator calculates `inflationAdjustedValue` but the UI for it is currently commented out.
