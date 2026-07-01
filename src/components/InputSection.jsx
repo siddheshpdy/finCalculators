@@ -22,7 +22,6 @@ const InputSection = ({
   setSearchQuery,
   selectedFund,
   setSelectedFund,
-  navData,
   setNavData,
   trackerLoading,
   handleRefreshFunds,

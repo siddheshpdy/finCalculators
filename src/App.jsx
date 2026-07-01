@@ -1,4 +1,3 @@
-import { useState, React } from 'react'
 import './App.css'
 // 1. Import your custom component
 import WealthPlanner from './components/WealthPlanner';

@@ -12,9 +12,7 @@ describe('useFinance Hook', () => {
     calculateSWP, 
     calculateGoalSIP,
     calculateRealSIP,
-    calculatePortfolio,
-    getFundList,
-    getFundNAV
+    calculatePortfolio
   } = result.current;
 
   it('calculateSIP: computes correct maturity value', () => {
