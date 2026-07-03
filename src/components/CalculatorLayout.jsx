@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import styles from './WealthPlanner.module.css';
 
 const CalculatorLayout = ({
@@ -6,11 +6,10 @@ const CalculatorLayout = ({
   setCurrentMenu,
   isMobileMenuOpen,
   setIsMobileMenuOpen,
-  children
+  children,
 }) => {
   const sidebarRef = useRef(null);
 
-  // Close mobile menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (isMobileMenuOpen && sidebarRef.current && !sidebarRef.current.contains(event.target)) {
@@ -27,28 +26,51 @@ const CalculatorLayout = ({
   return (
     <div className={styles.wealthPlannerRoot}>
       <div className={styles.mainContent}>
-        {/* Left Sidebar */}
         <aside className={styles.sidebar} ref={sidebarRef}>
           <div className={styles.sidebarHeader}>
             <h2 className={styles.sidebarTitle}>Calculators</h2>
-            <button 
-              className={styles.mobileMenuToggle} 
+            <button
+              className={styles.mobileMenuToggle}
+              aria-label="Toggle calculator menu"
+              aria-expanded={isMobileMenuOpen}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              {isMobileMenuOpen ? '✕' : '☰'}
+              {isMobileMenuOpen ? '\u2715' : '\u2630'}
             </button>
           </div>
-          <div className={`${styles.sidebarMenu} ${isMobileMenuOpen ? styles.mobileMenuOpen : ''}`}>
-            {['SIP', 'Lumpsum', 'RD', 'Loan', 'SWP', 'Goal', 'Tracker'].map(m => (
-              <button key={m} onClick={() => { setCurrentMenu(m); setIsMobileMenuOpen(false); }} className={`${styles.sidebarBtn} ${currentMenu === m ? styles.sidebarBtnActive : ''}`}>{m}</button>
+          <div
+            data-testid="sidebar-menu"
+            className={`${styles.sidebarMenu} ${isMobileMenuOpen ? styles.mobileMenuOpen : ''}`}
+          >
+            {['SIP', 'Lumpsum', 'RD', 'Loan', 'SWP', 'Goal', 'Tracker'].map((menu) => (
+              <button
+                key={menu}
+                onClick={() => {
+                  setCurrentMenu(menu);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`${styles.sidebarBtn} ${
+                  currentMenu === menu ? styles.sidebarBtnActive : ''
+                }`}
+              >
+                {menu}
+              </button>
             ))}
-            <button onClick={() => { setCurrentMenu('Help'); setIsMobileMenuOpen(false); }} className={`${styles.sidebarBtn} ${currentMenu === 'Help' ? styles.sidebarBtnActive : ''}`}>Help</button>
+            <button
+              onClick={() => {
+                setCurrentMenu('Help');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`${styles.sidebarBtn} ${
+                currentMenu === 'Help' ? styles.sidebarBtnActive : ''
+              }`}
+            >
+              Help
+            </button>
           </div>
         </aside>
 
-        <div className={styles.mainPanel}>
-          {children}
-        </div>
+        <div className={styles.mainPanel}>{children}</div>
       </div>
     </div>
   );

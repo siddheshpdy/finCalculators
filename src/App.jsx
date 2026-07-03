@@ -1,16 +1,17 @@
-import { useState, React } from 'react'
-import './App.css'
-// 1. Import your custom component
+import './App.css';
 import WealthPlanner from './components/WealthPlanner';
 
 function App() {
   return (
-    <div className="App">
-      <main style={{ height: 'calc(100vh - 50px)' }}>
+    <div className="appShell">
+      <main className="appMain">
         <WealthPlanner />
       </main>
-      <footer style={{ textAlign: 'center', color: '#666' }}>
-        <p>Built with React 19, Decimal.js, and Gemini. its fun project developed entirely using AI so calculations can be wrong</p>
+      <footer className="appFooter">
+        <p className="appFooterText">
+          Educational finance tools built with React and Decimal.js. Use the estimates as a
+          planning aid and verify important decisions independently.
+        </p>
       </footer>
     </div>
   );

@@ -15,7 +15,7 @@
 .sidebar {
   width: 220px;
   background: linear-gradient(180deg, #0b1220, #0f172a);
-  padding: 28px;
+  padding: 20px;
   box-shadow: 0 20px 40px rgba(2, 6, 23, 0.5);
   display: flex;
   flex-direction: column;
@@ -65,25 +65,127 @@
 .mainPanel {
   height: 100%;
   width: 100%;
-  background-color: white;
+  background:
+    radial-gradient(circle at top right, rgba(16, 185, 129, 0.06), transparent 22%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
   overflow-y: auto;
-  padding: 20px;
+  padding: 16px 18px 20px;
   box-sizing: border-box;
 }
 
-.controlGrid {
+.contentHeader {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1.2fr;
-  gap: 25px;
-  margin-bottom: 30px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.95fr);
+  gap: 18px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.contentHeaderSimple {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.contentHeaderBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contentEyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #0f766e;
+}
+
+.contentTitle {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1;
+  color: #0f172a;
+}
+
+.contentSubtitle {
+  max-width: 720px;
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.contentChipRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.contentChip {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.95));
+  box-shadow: 0 16px 34px -28px rgba(37, 99, 235, 0.32);
+}
+
+.contentChipLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.contentChipValue {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.workspaceGrid {
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.workspaceGridTopForm {
+  grid-template-columns: 1fr;
+}
+
+.workspaceGridTracker {
+  grid-template-columns: minmax(420px, 1.15fr) minmax(320px, 0.95fr);
+}
+
+.setupColumn,
+.outputColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.setupColumnTop {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.strategyCard {
+  min-height: 160px;
 }
 
 .innerCard {
   padding: 24px;
-  border-radius: 16px;
-  border: 1px solid #F1F5F9;
-  background-color: #FFFFFF;
+  border-radius: 22px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 22px 44px -34px rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(8px);
   box-sizing: border-box;
 }
 
@@ -95,28 +197,54 @@
   text-transform: uppercase;
 }
 
+.sectionIntro {
+  margin: -6px 0 20px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.inputFieldsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.mergedStrategySection {
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(226, 232, 240, 0.95);
+}
+
 .toggleWrapper {
-  display: inline-flex;
-  background-color: #F1F5F9;
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #f8fafc;
+  border: 1px solid #dbe4ee;
   padding: 4px;
-  border-radius: 8px;
-  margin-bottom: 20px;
+  border-radius: 14px;
+  margin-bottom: 0;
+  gap: 4px;
 }
 
 .toggleBtn {
-  padding: 6px 16px;
+  flex: 1;
+  padding: 10px 16px;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   background-color: transparent;
   color: #64748B;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .toggleBtnActive {
-  background-color: #3B82F6;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: white;
+  box-shadow: 0 10px 24px -18px rgba(37, 99, 235, 0.85);
 }
 
 .noStrategyText {
@@ -127,9 +255,13 @@
 }
 
 .resultsColumn {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.resultsColumn > :first-child {
+  grid-column: 1 / -1;
 }
 
 .totalPaidCard {
@@ -161,7 +293,7 @@
 }
 
 .chartContainer {
-  margin-bottom: 30px;
+  margin-bottom: 0;
 }
 
 .tableWrapper {
@@ -264,18 +396,42 @@
   }
 
   .mainPanel {
-    padding: 10px;
+    padding: 8px;
     height: auto;
     flex: 1;
   }
 
-  .controlGrid {
+  .contentHeader {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .contentTitle {
+    font-size: 26px;
+  }
+
+  .contentChipRow {
+    grid-template-columns: 1fr;
+  }
+
+  .workspaceGrid,
+  .workspaceGridTracker {
     grid-template-columns: 1fr;
     gap: 12px;
   }
 
+  .setupColumnTop,
+  .inputFieldsGrid {
+    grid-template-columns: 1fr;
+  }
+
   .innerCard {
     padding: 16px;
+  }
+
+  .resultsColumn {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -334,71 +490,186 @@
 }
 
 .searchContainer {
-  margin-bottom: 15px;
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.72), rgba(248, 250, 252, 0.94));
 }
 
 .searchInput {
   width: 100%;
-  padding: 8px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  margin-top: 5px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  margin-top: 10px;
   box-sizing: border-box;
+  background-color: rgba(255, 255, 255, 0.98);
+  color: #0f172a;
+  font-size: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.searchInput:focus,
+.dateInput:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+  background-color: #fff;
+}
+
+.searchResultsPanel {
+  margin-top: 10px;
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 32px -26px rgba(37, 99, 235, 0.45);
+  overflow: hidden;
+}
+
+.searchResultBtn {
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+  background: transparent;
+  color: #0f172a;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.searchResultBtn:first-child {
+  border-top: none;
+}
+
+.searchResultBtn:hover,
+.searchResultBtnActive {
+  background: linear-gradient(90deg, rgba(239, 246, 255, 0.96), rgba(248, 250, 252, 0.96));
+}
+
+.searchResultName {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.searchResultCode {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.searchEmptyState {
+  margin: 0;
+  padding: 14px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .loadingText {
   font-size: 12px;
-  color: #666;
+  color: #64748b;
+  margin: 10px 0 0;
+}
+
+.loadingPanel {
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loadingPanelText {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
 }
 
 .selectedFundBox {
-  margin-bottom: 15px;
-  padding: 10px;
-  background: #e0f2fe;
+  margin-bottom: 18px;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(224, 242, 254, 0.95), rgba(239, 246, 255, 0.98));
   color: #0c4a6e;
-  border-radius: 4px;
+  border: 1px solid rgba(125, 211, 252, 0.85);
+  border-radius: 18px;
   font-size: 13px;
 }
 
 .changeBtn {
-  float: right;
-  border: none;
-  background: none;
-  color: red;
+  border: 1px solid rgba(14, 116, 144, 0.18);
+  background: rgba(255, 255, 255, 0.9);
+  color: #0f766e;
   cursor: pointer;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 700;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.changeBtn:hover {
+  background-color: #ecfeff;
+  color: #155e75;
 }
 
 .fetchingText {
-  margin-top: 5px;
-  color: #666;
-  font-size: 11px;
+  margin-top: 10px;
+  color: #155e75;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .inputGroup {
-  margin-bottom: 15px;
+  margin-bottom: 18px;
+}
+
+.inputGroupCompact {
+  min-width: 0;
 }
 
 .label {
   display: block;
   font-size: 12px;
   font-weight: 700;
-  color: #64748B;
-  margin-bottom: 5px;
+  color: #475569;
+  margin-bottom: 6px;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
 }
 
 .dateInput {
   width: 100%;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
   box-sizing: border-box;
+  background-color: rgba(255, 255, 255, 0.98);
+  color: #0f172a;
+  font-size: 14px;
 }
 
 .helperText {
   font-size: 12px;
   color: #64748B;
   margin-top: 10px;
+}
+
+.controlHint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #94a3b8;
 }
 
 .textRed {
@@ -416,21 +687,29 @@
 .searchHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .refreshBtn {
-  background: none;
-  border: none;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  border-radius: 12px;
   cursor: pointer;
   font-size: 18px;
   color: #3B82F6;
   padding: 0;
   line-height: 1;
+  transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease;
 }
 
 .refreshBtn:hover {
   color: #1d4ed8;
+  background-color: #eff6ff;
+  transform: rotate(-20deg);
 }
 
 .portfolioList {
@@ -506,33 +785,42 @@
 .addFundBtn {
   width: 100%;
   padding: 12px;
-  background-color: #3B82F6;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 14px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 18px 34px -24px rgba(37, 99, 235, 0.95);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
 .addFundBtn:hover {
-  background-color: #2563EB;
+  transform: translateY(-1px);
+  box-shadow: 0 20px 38px -24px rgba(37, 99, 235, 1);
 }
 
 .addFundBtn:disabled {
   background-color: #94A3B8;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .cancelBtn {
   width: 100%;
   padding: 12px;
-  background-color: transparent;
-  color: #64748B;
+  background-color: rgba(255, 255, 255, 0.92);
+  color: #475569;
   border: 1px solid #CBD5E1;
-  border-radius: 8px;
+  border-radius: 14px;
   font-weight: 700;
   cursor: pointer;
-  margin-top: 10px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.cancelBtn:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
 /* Tracker Specific Styles */
@@ -784,6 +1072,19 @@
     position: static;
     box-shadow: none;
   }
+
+  .dateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .selectedFundHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .changeBtn {
+    align-self: flex-start;
+  }
 }
 
 /* Modal Styles */
@@ -947,16 +1248,17 @@
   background-color: #FFFFFF;
   color: #64748B;
   border: 1px solid #CBD5E1;
-  border-radius: 8px;
+  border-radius: 14px;
   font-weight: 700;
   cursor: pointer;
   text-align: center;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 
 .importBtn:hover {
   background-color: #F1F5F9;
   color: #334155;
+  border-color: #94a3b8;
 }
 
 .clearBtn {
@@ -1005,4 +1307,50 @@
   background-color: #EFF6FF;
   color: #3B82F6;
   border-color: #BFDBFE;
+}
+
+.selectedFundHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sectionDivider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 18px;
+}
+
+.sectionDividerLine {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0), rgba(226, 232, 240, 1), rgba(226, 232, 240, 0));
+}
+
+.sectionDividerText {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.formActionStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.importBtnFull {
+  width: 100%;
+  margin-bottom: 20px;
 }
